@@ -464,6 +464,28 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Firebase SDK for cloud sync -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script>
+    // Initialize Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyDdn79nK6HBf1PlrWftFnsEtVcYZ07EoxA",
+      authDomain: "turbowash-laundry.firebaseapp.com",
+      projectId: "turbowash-laundry",
+      storageBucket: "turbowash-laundry.firebasestorage.app",
+      messagingSenderId: "533027712618",
+      appId: "1:533027712618:web:e3013c65f203e62d4d2413"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const firestore = firebase.firestore();
+    
+    // Enable offline
+    firestore.enablePersistence().catch(() => {});
+    
+    console.log("Firebase ready for cloud sync ✅");
+  </script>
 </head>
 <body>
 <div id="app">
@@ -505,6 +527,9 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
       <h1>TurboWash Laundry</h1>
       <p id="headerUserInfo">Loading...</p>
     </div>
+    <button onclick="manualSync()" style="padding:8px 12px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:white;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;" id="syncBtn">
+      <span id="syncIcon">🔄</span> <span id="syncText">Sync</span>
+    </button>
     <div class="header-actions">
       <button class="header-btn" onclick="showNotifications()" id="notifBtn">
         🔔<span class="badge hidden" id="notifBadge">0</span>
@@ -857,6 +882,179 @@ const DB = {
 };
 
 // ============================================================
+// FIREBASE CLOUD SYNC (Background)
+// ============================================================
+function syncToCloud(key, value) {
+  if (typeof firebase === 'undefined') return;
+  setTimeout(async () => {
+    try {
+      await firestore.collection('appData').doc(key).set({
+        data: value,
+        updated: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      console.log('✅ Synced to cloud:', key);
+    } catch(e) { 
+      console.error('Sync failed:', key, e);
+    }
+  }, 100);
+}
+
+// Manual sync button function
+async function manualSync() {
+  const btn = document.getElementById('syncBtn');
+  const icon = document.getElementById('syncIcon');
+  const text = document.getElementById('syncText');
+  
+  if (typeof firebase === 'undefined') {
+    showToast('Firebase not initialized', 'error');
+    return;
+  }
+  
+  btn.disabled = true;
+  icon.textContent = '⏳';
+  text.textContent = 'Syncing...';
+  
+  try {
+    // STEP 1: Push all local data to cloud
+    const keys = ['orders', 'customers', 'services', 'users', 'shopSettings', 'orderCounter', 'whatsappTemplates', 'shareCounts'];
+    let pushed = 0;
+    
+    for (const key of keys) {
+      const data = DB.get(key);
+      if (data) {
+        await firestore.collection('appData').doc(key).set({
+          data: data,
+          updated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        pushed++;
+      }
+    }
+    
+    // STEP 2: Pull all data from cloud
+    const snapshot = await firestore.collection('appData').get();
+    let pulled = 0;
+    
+    snapshot.forEach(doc => {
+      const cloudData = doc.data().data;
+      if (cloudData) {
+        localStorage.setItem('twl_' + doc.id, JSON.stringify(cloudData));
+        pulled++;
+      }
+    });
+    
+    // STEP 3: Refresh UI
+    if (typeof renderOrders === 'function') renderOrders();
+    if (typeof renderDueDatePage === 'function') renderDueDatePage();
+    if (typeof refreshDashboard === 'function') refreshDashboard();
+    if (typeof renderCustomers === 'function') renderCustomers();
+    
+    icon.textContent = '✅';
+    text.textContent = 'Synced!';
+    showToast(`Sync complete! ↑${pushed} ↓${pulled}`, 'success');
+    
+    setTimeout(() => {
+      icon.textContent = '🔄';
+      text.textContent = 'Sync';
+      btn.disabled = false;
+    }, 2000);
+    
+  } catch(err) {
+    console.error('Manual sync error:', err);
+    icon.textContent = '❌';
+    text.textContent = 'Failed';
+    showToast('Sync failed: ' + err.message, 'error');
+    
+    setTimeout(() => {
+      icon.textContent = '🔄';
+      text.textContent = 'Sync';
+      btn.disabled = false;
+    }, 2000);
+  }
+}
+
+// Auto-sync on data changes
+const originalDBSet = DB.set;
+DB.set = function(key, val) {
+  const result = originalDBSet(key, val);
+  syncToCloud(key, val);
+  return result;
+};
+
+// Pull from cloud on startup
+async function pullFromCloud() {
+  if (typeof firebase === 'undefined') return;
+  try {
+    const snapshot = await firestore.collection('appData').get();
+    let updated = false;
+    snapshot.forEach(doc => {
+      const local = DB.get(doc.id);
+      const cloud = doc.data().data;
+      // Use cloud data if local doesn't exist
+      if (!local && cloud) {
+        localStorage.setItem('twl_' + doc.id, JSON.stringify(cloud));
+        updated = true;
+      }
+    });
+    if (updated) {
+      console.log('✅ Synced from cloud');
+      // Refresh UI instead of reload
+      if (typeof renderOrders === 'function') renderOrders();
+      if (typeof renderDueDatePage === 'function') renderDueDatePage();
+      if (typeof refreshDashboard === 'function') refreshDashboard();
+    }
+  } catch(e) { 
+    console.error('Pull error:', e);
+  }
+}
+
+// Listen for changes from other devices
+let syncTimeout;
+if (typeof firebase !== 'undefined') {
+  // Wait for app to load before starting listener
+  setTimeout(() => {
+    firestore.collection('appData').onSnapshot((snapshot) => {
+      clearTimeout(syncTimeout);
+      syncTimeout = setTimeout(() => {
+        let needsRefresh = false;
+        
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'modified' || change.type === 'added') {
+            const key = change.doc.id;
+            const cloudData = change.doc.data().data;
+            const localData = DB.get(key);
+            
+            // Update if different or doesn't exist locally
+            const cloudStr = JSON.stringify(cloudData);
+            const localStr = JSON.stringify(localData);
+            
+            if (cloudStr !== localStr) {
+              localStorage.setItem('twl_' + key, cloudStr);
+              console.log('🔄 Synced from cloud:', key);
+              
+              if (['orders', 'customers', 'services'].includes(key)) {
+                needsRefresh = true;
+              }
+            }
+          }
+        });
+        
+        // Refresh UI
+        if (needsRefresh) {
+          if (typeof renderOrders === 'function') renderOrders();
+          if (typeof renderDueDatePage === 'function') renderDueDatePage();
+          if (typeof refreshDashboard === 'function') refreshDashboard();
+          if (typeof renderCustomers === 'function') renderCustomers();
+          showToast('Data updated from cloud 🔄', 'info');
+        }
+      }, 1000);
+    }, (error) => {
+      console.error('Listener error:', error);
+    });
+  }, 3000); // Wait 3 seconds after login
+}
+
+
+// ============================================================
 // INITIAL DATA SETUP
 // ============================================================
 function initApp() {
@@ -1058,6 +1256,14 @@ function showMainApp() {
 
   checkOverduePopup();
   updateLastBackup();
+  
+  // Auto-sync from cloud on login
+  if (typeof firebase !== 'undefined') {
+    setTimeout(() => {
+      console.log('🔄 Auto-syncing from cloud...');
+      manualSync();
+    }, 2000);
+  }
   
   // Check if this is a tracking URL
   checkTrackingURL();
