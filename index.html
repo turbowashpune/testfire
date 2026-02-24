@@ -915,34 +915,140 @@ async function manualSync() {
   text.textContent = 'Syncing...';
   
   try {
-    // STEP 1: Push all local data to cloud
-    const keys = ['orders', 'customers', 'services', 'users', 'shopSettings', 'orderCounter', 'whatsappTemplates', 'shareCounts'];
-    let pushed = 0;
+    console.log('🔄 Starting sync...');
     
-    for (const key of keys) {
-      const data = DB.get(key);
-      if (data) {
-        await firestore.collection('appData').doc(key).set({
-          data: data,
-          updated: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        pushed++;
-      }
-    }
-    
-    // STEP 2: Pull all data from cloud
+    // STEP 1: First PULL from cloud to get latest data
     const snapshot = await firestore.collection('appData').get();
-    let pulled = 0;
+    let cloudOrders = [];
+    let cloudCustomers = [];
+    let cloudServices = null;
+    let cloudUsers = null;
+    let cloudSettings = null;
+    let cloudCounter = 0;
+    let cloudTemplates = null;
     
     snapshot.forEach(doc => {
-      const cloudData = doc.data().data;
-      if (cloudData) {
-        localStorage.setItem('twl_' + doc.id, JSON.stringify(cloudData));
-        pulled++;
+      const docData = doc.data();
+      if (docData && docData.data) {
+        if (doc.id === 'orders') cloudOrders = docData.data || [];
+        if (doc.id === 'customers') cloudCustomers = docData.data || [];
+        if (doc.id === 'services') cloudServices = docData.data;
+        if (doc.id === 'users') cloudUsers = docData.data;
+        if (doc.id === 'shopSettings') cloudSettings = docData.data;
+        if (doc.id === 'orderCounter') cloudCounter = docData.data || 0;
+        if (doc.id === 'whatsappTemplates') cloudTemplates = docData.data;
       }
     });
     
-    // STEP 3: Refresh UI
+    console.log('📥 Pulled from cloud:', cloudOrders.length, 'orders,', cloudCustomers.length, 'customers');
+    
+    // STEP 2: Merge local with cloud data
+    const localOrders = DB.get('orders') || [];
+    const localCustomers = DB.get('customers') || [];
+    
+    // Create merged orders (cloud + local, deduplicated by ID)
+    const mergedOrders = [...cloudOrders];
+    localOrders.forEach(localOrder => {
+      const existingIndex = mergedOrders.findIndex(o => o.id === localOrder.id);
+      if (existingIndex === -1) {
+        // New local order not in cloud - add it
+        mergedOrders.push(localOrder);
+      } else {
+        // Order exists in both - keep the one with latest timestamp
+        const cloudOrder = mergedOrders[existingIndex];
+        const localTime = localOrder.createdAt || 0;
+        const cloudTime = cloudOrder.createdAt || 0;
+        if (localTime > cloudTime) {
+          mergedOrders[existingIndex] = localOrder;
+        }
+      }
+    });
+    
+    // Create merged customers (cloud + local, deduplicated by ID)
+    const mergedCustomers = [...cloudCustomers];
+    localCustomers.forEach(localCustomer => {
+      const existingIndex = mergedCustomers.findIndex(c => c.id === localCustomer.id);
+      if (existingIndex === -1) {
+        // New local customer not in cloud - add it
+        mergedCustomers.push(localCustomer);
+      } else {
+        // Customer exists in both - keep the one with latest timestamp
+        const cloudCustomer = mergedCustomers[existingIndex];
+        const localTime = localCustomer.createdAt || 0;
+        const cloudTime = cloudCustomer.createdAt || 0;
+        if (localTime > cloudTime) {
+          mergedCustomers[existingIndex] = localCustomer;
+        }
+      }
+    });
+    
+    console.log('🔀 Merged data:', mergedOrders.length, 'orders,', mergedCustomers.length, 'customers');
+    
+    // STEP 3: Push merged data back to cloud
+    await firestore.collection('appData').doc('orders').set({
+      data: mergedOrders,
+      updated: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    await firestore.collection('appData').doc('customers').set({
+      data: mergedCustomers,
+      updated: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    // Push other data (these don't need merging, just sync latest)
+    const localServices = DB.get('services');
+    if (localServices) {
+      await firestore.collection('appData').doc('services').set({
+        data: localServices,
+        updated: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    
+    const localUsers = DB.get('users');
+    if (localUsers) {
+      await firestore.collection('appData').doc('users').set({
+        data: localUsers,
+        updated: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    
+    const localSettings = DB.get('shopSettings');
+    if (localSettings) {
+      await firestore.collection('appData').doc('shopSettings').set({
+        data: localSettings,
+        updated: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    
+    const localCounter = DB.get('orderCounter') || 0;
+    const maxCounter = Math.max(localCounter, cloudCounter);
+    await firestore.collection('appData').doc('orderCounter').set({
+      data: maxCounter,
+      updated: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    const localTemplates = DB.get('whatsappTemplates');
+    if (localTemplates) {
+      await firestore.collection('appData').doc('whatsappTemplates').set({
+        data: localTemplates,
+        updated: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    
+    console.log('📤 Pushed merged data to cloud');
+    
+    // STEP 4: Save merged data to local storage
+    DB.set('orders', mergedOrders);
+    DB.set('customers', mergedCustomers);
+    if (cloudServices) DB.set('services', cloudServices);
+    if (cloudUsers) DB.set('users', cloudUsers);
+    if (cloudSettings) DB.set('shopSettings', cloudSettings);
+    if (maxCounter) DB.set('orderCounter', maxCounter);
+    if (cloudTemplates) DB.set('whatsappTemplates', cloudTemplates);
+    
+    console.log('💾 Saved merged data to local storage');
+    
+    // STEP 5: Refresh UI
     if (typeof renderOrders === 'function') renderOrders();
     if (typeof renderDueDatePage === 'function') renderDueDatePage();
     if (typeof refreshDashboard === 'function') refreshDashboard();
@@ -950,7 +1056,7 @@ async function manualSync() {
     
     icon.textContent = '✅';
     text.textContent = 'Synced!';
-    showToast(`Sync complete! ↑${pushed} ↓${pulled}`, 'success');
+    showToast(`Sync complete! ${mergedOrders.length} orders, ${mergedCustomers.length} customers`, 'success');
     
     setTimeout(() => {
       icon.textContent = '🔄';
@@ -984,24 +1090,60 @@ DB.set = function(key, val) {
 async function pullFromCloud() {
   if (typeof firebase === 'undefined') return;
   try {
+    console.log('🔄 Auto-syncing on startup...');
     const snapshot = await firestore.collection('appData').get();
-    let updated = false;
+    let cloudOrders = [];
+    let cloudCustomers = [];
+    
     snapshot.forEach(doc => {
-      const local = DB.get(doc.id);
-      const cloud = doc.data().data;
-      // Use cloud data if local doesn't exist
-      if (!local && cloud) {
-        localStorage.setItem('twl_' + doc.id, JSON.stringify(cloud));
-        updated = true;
+      const docData = doc.data();
+      if (docData && docData.data) {
+        const key = doc.id;
+        
+        // For orders and customers, merge with local
+        if (key === 'orders') {
+          cloudOrders = docData.data || [];
+          const localOrders = DB.get('orders') || [];
+          const merged = [...cloudOrders];
+          
+          localOrders.forEach(localOrder => {
+            if (!merged.find(o => o.id === localOrder.id)) {
+              merged.push(localOrder);
+            }
+          });
+          
+          DB.set('orders', merged);
+          console.log('✅ Merged orders:', merged.length);
+        } else if (key === 'customers') {
+          cloudCustomers = docData.data || [];
+          const localCustomers = DB.get('customers') || [];
+          const merged = [...cloudCustomers];
+          
+          localCustomers.forEach(localCustomer => {
+            if (!merged.find(c => c.id === localCustomer.id)) {
+              merged.push(localCustomer);
+            }
+          });
+          
+          DB.set('customers', merged);
+          console.log('✅ Merged customers:', merged.length);
+        } else {
+          // For other data, use cloud if local doesn't exist
+          const local = DB.get(key);
+          if (!local && docData.data) {
+            DB.set(key, docData.data);
+            console.log('✅ Loaded', key, 'from cloud');
+          }
+        }
       }
     });
-    if (updated) {
-      console.log('✅ Synced from cloud');
-      // Refresh UI instead of reload
-      if (typeof renderOrders === 'function') renderOrders();
-      if (typeof renderDueDatePage === 'function') renderDueDatePage();
-      if (typeof refreshDashboard === 'function') refreshDashboard();
-    }
+    
+    // Refresh UI
+    if (typeof renderOrders === 'function') renderOrders();
+    if (typeof renderDueDatePage === 'function') renderDueDatePage();
+    if (typeof refreshDashboard === 'function') refreshDashboard();
+    if (typeof renderCustomers === 'function') renderCustomers();
+    
   } catch(e) { 
     console.error('Pull error:', e);
   }
@@ -1028,8 +1170,23 @@ if (typeof firebase !== 'undefined') {
             const localStr = JSON.stringify(localData);
             
             if (cloudStr !== localStr) {
-              localStorage.setItem('twl_' + key, cloudStr);
-              console.log('🔄 Synced from cloud:', key);
+              // For orders and customers, merge instead of replace
+              if (key === 'orders' || key === 'customers') {
+                const merged = [...(cloudData || [])];
+                const local = localData || [];
+                
+                local.forEach(localItem => {
+                  if (!merged.find(item => item.id === localItem.id)) {
+                    merged.push(localItem);
+                  }
+                });
+                
+                DB.set(key, merged);
+                console.log('🔄 Merged from cloud:', key, merged.length, 'items');
+              } else {
+                DB.set(key, cloudData);
+                console.log('🔄 Synced from cloud:', key);
+              }
               
               if (['orders', 'customers', 'services'].includes(key)) {
                 needsRefresh = true;
