@@ -191,7 +191,9 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
 .status-received { background:#E3F2FD; color:#1565C0; }
 .status-inprogress { background:#FFF8E1; color:#F57F17; }
 .status-ready { background:#E8F5E9; color:#2E7D32; }
-.status-delivered { background:#F3E5F5; color:#6A1B9A; }
+.status-paid_delivered { background:#E8F5E9; color:#1B5E20; }
+.status-unpaid_delivered { background:#FFF3E0; color:#E65100; }
+.status-cancelled { background:#FFEBEE; color:#C62828; }
 .status-cancelled { background:#FFEBEE; color:#B71C1C; }
 .order-customer { font-weight:600; font-size:14px; color:var(--text); }
 .order-phone { font-size:12px; color:var(--text2); }
@@ -1201,7 +1203,7 @@ if (typeof firebase !== 'undefined') {
           if (typeof renderDueDatePage === 'function') renderDueDatePage();
           if (typeof refreshDashboard === 'function') refreshDashboard();
           if (typeof renderCustomers === 'function') renderCustomers();
-          showToast('Data updated from cloud 🔄', 'info');
+          // Toast removed - no longer showing "Data updated from cloud"
         }
       }, 1000);
     }, (error) => {
@@ -1215,6 +1217,15 @@ if (typeof firebase !== 'undefined') {
 // INITIAL DATA SETUP
 // ============================================================
 function initApp() {
+  // Check if this is a tracking URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const trackingCode = urlParams.get('track');
+  
+  if (trackingCode) {
+    showTrackingPage(trackingCode);
+    return; // Don't proceed with normal app initialization
+  }
+  
   // Setup default users if none exist
   if (!DB.get('users')) {
     DB.set('users', [
@@ -1463,9 +1474,23 @@ function showTrackingPage(orderNo) {
   const shop = DB.get('shopSettings') || {};
   
   // Status timeline
-  const statuses = ['received','inprogress','ready','delivered'];
-  const statusLabels = {received:'Order Received',inprogress:'In Progress',ready:'Ready for Pickup',delivered:'Delivered'};
-  const statusIcons = {received:'📦',inprogress:'⏳',ready:'✅',delivered:'🎉'};
+  const statuses = ['received','inprogress','ready','paid_delivered','unpaid_delivered','cancelled'];
+  const statusLabels = {
+    received:'Received',
+    inprogress:'In-Progress',
+    ready:'Ready',
+    paid_delivered:'Paid & Delivered',
+    unpaid_delivered:'Un-Paid & Delivered',
+    cancelled:'Cancelled'
+  };
+  const statusIcons = {
+    received:'📦',
+    inprogress:'⏳',
+    ready:'✅',
+    paid_delivered:'💰',
+    unpaid_delivered:'📦',
+    cancelled:'❌'
+  };
   
   const currentIndex = statuses.indexOf(order.status);
   
@@ -1608,6 +1633,7 @@ function refreshDashboard() {
   const todayOrders = orders.filter(o => o.createdAt && o.createdAt.startsWith(today));
   const pendingOrders = orders.filter(o => ['received','inprogress'].includes(o.status));
   const readyOrders = orders.filter(o => o.status === 'ready');
+  const deliveredOrders = orders.filter(o => ['paid_delivered','unpaid_delivered'].includes(o.status));
   const overdueOrders = orders.filter(o => isOverdue(o));
 
   document.getElementById('statToday').textContent = todayOrders.length;
@@ -1659,7 +1685,7 @@ function refreshDashboard() {
 // ============================================================
 function checkIfNeedsNotification(order) {
   // Only for ready and delivered status
-  if (order.status !== 'ready' && order.status !== 'delivered') return false;
+  if (!['ready','paid_delivered','unpaid_delivered'].includes(order.status)) return false;
   
   // Check if notification was sent for current status
   if (!order.notificationsSent || order.notificationsSent.length === 0) {
@@ -1684,13 +1710,13 @@ function checkIfNeedsNotification(order) {
 }
 
 function isOverdue(order) {
-  if (!order.dueDate || order.status === 'delivered' || order.status === 'cancelled') return false;
+  if (!order.dueDate || ['paid_delivered','unpaid_delivered','cancelled'].includes(order.status)) return false;
   const due = new Date(order.dueDate); due.setHours(23,59,59,0);
   return new Date() > due;
 }
 
 function isDueToday(order) {
-  if (!order.dueDate || order.status === 'delivered' || order.status === 'cancelled') return false;
+  if (!order.dueDate || ['paid_delivered','unpaid_delivered','cancelled'].includes(order.status)) return false;
   const today = new Date().toISOString().split('T')[0];
   return order.dueDate === today && !isOverdue(order);
 }
@@ -1713,7 +1739,14 @@ function getStatusLabel(status) {
 }
 
 function getStatusClass(status) {
-  const cls = { received:'status-received', inprogress:'status-inprogress', ready:'status-ready', delivered:'status-delivered', cancelled:'status-cancelled' };
+  const cls = { 
+    received:'status-received', 
+    inprogress:'status-inprogress', 
+    ready:'status-ready', 
+    paid_delivered:'status-paid_delivered', 
+    unpaid_delivered:'status-unpaid_delivered', 
+    cancelled:'status-cancelled' 
+  };
   return cls[status] || '';
 }
 
@@ -1812,7 +1845,7 @@ function filterOrders() { renderOrders(); }
 // ============================================================
 function renderDueDatePage() {
   const orders = DB.get('orders') || [];
-  const active = orders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
+  const active = orders.filter(o => !['paid_delivered','unpaid_delivered','cancelled'].includes(o.status));
 
   const overdue = active.filter(o => isOverdue(o)).sort((a,b) => new Date(a.dueDate)-new Date(b.dueDate));
   const dueToday = active.filter(o => isDueToday(o)).sort((a,b) => new Date(a.dueDate)-new Date(b.dueDate));
@@ -2479,6 +2512,8 @@ function saveOrder() {
       customerName: name, customerPhone: phone, customerPhone2: phone2, customerAddress: address,
       services: orderServices, totalAmount, paidAmount, paymentMode, notes,
       status: 'received',
+      trackingCode: generateTrackingCode('ord_' + Date.now()),
+      trackingExpiry: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
       statusHistory: [{ status:'received', changedAt: new Date().toISOString(), changedBy: currentUser.name }],
       createdAt: new Date().toISOString(), createdBy: currentUser.name
     };
@@ -2487,9 +2522,10 @@ function saveOrder() {
     currentInvoiceOrderId = newOrder.id;
     showToast('Order ' + orderNo + ' created! 🎉', 'success');
 
-    // Auto send WhatsApp
-    setTimeout(() => {
-      sendWhatsAppMessage(newOrder, 'orderReceived');
+    // Auto send WhatsApp (only if not operator)
+    if (currentUser.role !== 'operator') {
+      setTimeout(() => {
+        sendWhatsAppMessage(newOrder, 'orderReceived');
     }, 500);
   }
 
@@ -2547,7 +2583,7 @@ function showOrderDetail(orderId) {
   const balance = (order.totalAmount||0) - (order.paidAmount||0);
   const overdue = isOverdue(order);
 
-  const statusOptions = ['received','inprogress','ready','delivered','cancelled'];
+  const statusOptions = ['received','inprogress','ready','paid_delivered','unpaid_delivered','cancelled'];
   const isAdmin = currentUser.role === 'admin';
   const isOperatorPlus = isAdmin || currentUser.role === 'operator';
 
@@ -2643,11 +2679,26 @@ function showOrderDetail(orderId) {
 
     ${isOperatorPlus ? `<div style="margin-bottom:12px;">
       <div style="font-weight:700;margin-bottom:8px;color:var(--text2);font-size:12px;text-transform:uppercase;">Update Status</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;">
-        ${statusOptions.filter(s => s !== order.status).map(s => `
-          <button class="btn btn-secondary btn-sm"
-            onclick="updateOrderStatus('${order.id}','${s}')">
-            → ${getStatusLabel(s)}
+      
+      <!-- Line 1: Received | In-Progress | Ready | Paid & Delivered -->
+      <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;">
+        ${['received','inprogress','ready','paid_delivered'].map(s => `
+          <button class="btn ${order.status === s ? 'btn-primary' : 'btn-secondary'} btn-sm"
+            style="flex:1;min-width:100px;${order.status === s ? 'font-weight:800;box-shadow:0 2px 8px rgba(255,107,0,0.3);' : ''}"
+            onclick="${order.status === s ? 'void(0)' : `updateOrderStatus('${order.id}','${s}')`}"
+            ${order.status === s ? 'disabled' : ''}>
+            ${order.status === s ? '✓ ' : ''}${getStatusLabel(s)}
+          </button>`).join('')}
+      </div>
+      
+      <!-- Line 2: Un-Paid & Delivered | Cancelled -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${['unpaid_delivered','cancelled'].map(s => `
+          <button class="btn ${order.status === s ? 'btn-primary' : 'btn-secondary'} btn-sm"
+            style="flex:1;min-width:140px;${order.status === s ? 'font-weight:800;box-shadow:0 2px 8px rgba(255,107,0,0.3);' : ''}"
+            onclick="${order.status === s ? 'void(0)' : `updateOrderStatus('${order.id}','${s}')`}"
+            ${order.status === s ? 'disabled' : ''}>
+            ${order.status === s ? '✓ ' : ''}${getStatusLabel(s)}
           </button>`).join('')}
       </div>
     </div>` : ''}
@@ -2665,10 +2716,12 @@ function showOrderDetail(orderId) {
   document.getElementById('orderDetailTitle').textContent = 'Order ' + order.orderNo;
   document.getElementById('orderDetailBody').innerHTML = html;
 
-  // TOP ROW: Share on WhatsApp + Share Invoice
+  // TOP ROW: Share on WhatsApp + Share Invoice (Admin and Viewer only, NOT Operator)
   const row1 = [];
-  row1.push(`<button class="btn btn-success" style="flex:1;padding:8px 10px;font-size:13px;" onclick="shareOrderWhatsAppText('${order.id}')">💬 Share on WhatsApp</button>`);
-  row1.push(`<button class="btn btn-info" style="flex:1;padding:8px 10px;font-size:13px;" onclick="shareOrderInvoiceImage('${order.id}')">📄 Share Invoice</button>`);
+  if (currentUser.role !== 'operator') {
+    row1.push(`<button class="btn btn-success" style="flex:1;padding:8px 10px;font-size:13px;" onclick="shareOrderWhatsAppText('${order.id}')">💬 Share on WhatsApp</button>`);
+    row1.push(`<button class="btn btn-info" style="flex:1;padding:8px 10px;font-size:13px;" onclick="shareOrderInvoiceImage('${order.id}')">📄 Share Invoice</button>`);
+  }
   
   // BOTTOM ROW: PDF + Edit + Delete
   const row2 = [];
@@ -2678,7 +2731,7 @@ function showOrderDetail(orderId) {
 
   document.getElementById('orderDetailFooter').innerHTML = 
     `<div style="display:flex;flex-direction:column;gap:8px;width:100%;">
-      <div style="display:flex;gap:8px;">${row1.join('')}</div>
+      ${row1.length > 0 ? `<div style="display:flex;gap:8px;">${row1.join('')}</div>` : ''}
       <div style="display:flex;gap:8px;">${row2.join('')}</div>
     </div>`;
   openModal('orderDetailModal');
@@ -2694,6 +2747,12 @@ function updateOrderStatus(orderId, newStatus) {
   order.statusHistory.push({ status: newStatus, changedAt: new Date().toISOString(), changedBy: currentUser.name });
   order.updatedAt = new Date().toISOString();
 
+  // Generate tracking code when status is set to "received"
+  if (newStatus === 'received' && !order.trackingCode) {
+    order.trackingCode = generateTrackingCode(order.id);
+    order.trackingExpiry = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(); // 60 days from now
+  }
+
   DB.set('orders', orders);
   showToast('Status updated to ' + getStatusLabel(newStatus) + ' ✅', 'success');
   closeModal('orderDetailModal');
@@ -2701,10 +2760,25 @@ function updateOrderStatus(orderId, newStatus) {
   refreshDashboard();
   renderDueDatePage();
 
+  // Auto WhatsApp for received status (with tracking link)
+  if (newStatus === 'received' && currentUser.role !== 'operator') {
+    setTimeout(() => sendWhatsAppMessage(order, 'orderReceived'), 500);
+  }
+  
   // Auto WhatsApp for ready status
-  if (newStatus === 'ready') {
+  if (newStatus === 'ready' && currentUser.role !== 'operator') {
     setTimeout(() => sendWhatsAppMessage(order, 'orderReady'), 500);
   }
+}
+
+function generateTrackingCode(orderId) {
+  // Generate a unique 8-character tracking code
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed similar looking chars
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
 }
 
 function collectPayment(orderId) {
@@ -2825,6 +2899,12 @@ function sendWhatsAppMessage(order, templateKey) {
     .replace(/{dueDate}/g, formatDate(order.dueDate))
     .replace(/{shopName}/g, shop.name||'TurboWash Laundry')
     .replace(/{shopPhone}/g, shop.phone||'');
+
+  // Add tracking URL for "received" status
+  if (templateKey === 'orderReceived' && order.trackingCode) {
+    const trackingUrl = window.location.origin + window.location.pathname + '?track=' + order.trackingCode;
+    msg += `\n\n📍 Track your order here:\n${trackingUrl}\n\n(Link valid for 60 days)`;
+  }
 
   const phone = order.customerPhone.replace(/[^0-9]/g,'');
   const url = `https://wa.me/${phone.startsWith('91')?phone:'91'+phone}?text=${encodeURIComponent(msg)}`;
@@ -4510,6 +4590,140 @@ function embedLogo() {
 // ============================================================
 // INIT
 // ============================================================
+// ============================================================
+// ORDER TRACKING PAGE
+// ============================================================
+function showTrackingPage(trackingCode) {
+  const orders = DB.get('orders') || [];
+  const order = orders.find(o => o.trackingCode === trackingCode);
+  
+  // Hide main app
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('loginPage').style.display = 'none';
+  
+  // Create tracking page
+  const trackingPage = document.createElement('div');
+  trackingPage.id = 'trackingPage';
+  trackingPage.style.cssText = 'min-height:100vh;background:linear-gradient(135deg,#1A1A2E,#16213E);padding:20px;display:flex;align-items:center;justify-content:center;';
+  
+  if (!order) {
+    trackingPage.innerHTML = `
+      <div style="background:white;border-radius:20px;padding:40px;max-width:500px;text-align:center;">
+        <div style="font-size:64px;margin-bottom:16px;">❌</div>
+        <h2 style="font-family:'Nunito',sans-serif;font-weight:800;font-size:24px;color:var(--text);margin-bottom:12px;">Order Not Found</h2>
+        <p style="color:var(--text2);font-size:14px;margin-bottom:24px;">
+          This tracking code is invalid or has expired.
+        </p>
+        <div style="font-size:12px;color:var(--text3);">
+          Tracking code: <strong>${trackingCode}</strong>
+        </div>
+      </div>`;
+  } else {
+    // Check if tracking link has expired
+    const isExpired = order.trackingExpiry && new Date() > new Date(order.trackingExpiry);
+    
+    if (isExpired) {
+      trackingPage.innerHTML = `
+        <div style="background:white;border-radius:20px;padding:40px;max-width:500px;text-align:center;">
+          <div style="font-size:64px;margin-bottom:16px;">⏰</div>
+          <h2 style="font-family:'Nunito',sans-serif;font-weight:800;font-size:24px;color:var(--text);margin-bottom:12px;">Tracking Link Expired</h2>
+          <p style="color:var(--text2);font-size:14px;margin-bottom:24px;">
+            This tracking link has expired after 60 days.<br>
+            Please contact us for order status.
+          </p>
+          <div style="font-size:12px;color:var(--text3);">
+            Order: <strong>${order.orderNo}</strong>
+          </div>
+        </div>`;
+    } else {
+      // Show tracking information
+      const statusLabels = {
+        received:'Received ✓',
+        inprogress:'In-Progress ✓',
+        ready:'Ready for Pickup ✓',
+        paid_delivered:'Delivered & Paid ✓',
+        unpaid_delivered:'Delivered (Payment Pending)',
+        cancelled:'Cancelled'
+      };
+      
+      const statusColors = {
+        received:'#2196F3',
+        inprogress:'#FF9800',
+        ready:'#4CAF50',
+        paid_delivered:'#4CAF50',
+        unpaid_delivered:'#FF9800',
+        cancelled:'#F44336'
+      };
+      
+      const currentColor = statusColors[order.status] || '#666';
+      const isDelivered = ['paid_delivered','unpaid_delivered'].includes(order.status);
+      
+      // Calculate expected ready time (due date)
+      const expectedReady = formatDate(order.dueDate) + (order.dueTime ? ' at ' + order.dueTime : '');
+      
+      trackingPage.innerHTML = `
+        <div style="background:white;border-radius:20px;padding:32px;max-width:600px;width:100%;">
+          <div style="text-align:center;margin-bottom:32px;">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 120'%3E%3Crect width='400' height='120' fill='%23FF6B00'/%3E%3Ctext x='200' y='70' font-family='Nunito' font-weight='900' font-size='48' fill='white' text-anchor='middle'%3ETurboWash%3C/text%3E%3Ctext x='200' y='95' font-family='Poppins' font-size='14' fill='%23FFE44D' text-anchor='middle'%3ELaundry Management%3C/text%3E%3C/svg%3E" 
+                 style="width:200px;height:auto;border-radius:12px;margin-bottom:16px;">
+            <h2 style="font-family:'Nunito',sans-serif;font-weight:800;font-size:28px;color:var(--text);margin-bottom:8px;">Order ${order.orderNo}</h2>
+            <p style="color:var(--text2);font-size:14px;">${order.customerName}</p>
+          </div>
+          
+          <div style="background:${currentColor};color:white;border-radius:16px;padding:24px;margin-bottom:24px;text-align:center;">
+            <div style="font-size:48px;margin-bottom:12px;">${['paid_delivered','unpaid_delivered'].includes(order.status) ? '🎉' : order.status === 'ready' ? '✅' : order.status === 'inprogress' ? '⏳' : '📦'}</div>
+            <div style="font-weight:800;font-size:24px;font-family:'Nunito',sans-serif;margin-bottom:8px;">
+              ${statusLabels[order.status]}
+            </div>
+            ${!isDelivered ? `
+              <div style="font-size:14px;opacity:0.9;">
+                Expected Ready: ${expectedReady}
+              </div>
+            ` : ''}
+          </div>
+          
+          <div style="margin-bottom:24px;">
+            <div style="font-weight:700;font-size:13px;color:var(--text2);margin-bottom:12px;text-transform:uppercase;">Order Timeline</div>
+            ${(order.statusHistory || []).map((h, i) => `
+              <div style="display:flex;gap:12px;margin-bottom:12px;align-items:start;">
+                <div style="width:32px;height:32px;border-radius:50%;background:${i === order.statusHistory.length - 1 ? currentColor : '#E0E0E0'};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;">
+                  ${i === order.statusHistory.length - 1 ? '●' : '✓'}
+                </div>
+                <div style="flex:1;">
+                  <div style="font-weight:700;font-size:14px;color:var(--text);">${statusLabels[h.status] || h.status}</div>
+                  <div style="font-size:12px;color:var(--text3);">${formatDateTime(h.changedAt)}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          
+          <div style="background:rgba(255,107,0,0.08);border-radius:12px;padding:16px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+              <span style="color:var(--text2);font-size:13px;">Total Amount</span>
+              <span style="font-weight:700;font-size:15px;color:var(--text);">₹${order.totalAmount}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+              <span style="color:var(--text2);font-size:13px;">Paid</span>
+              <span style="font-weight:700;font-size:15px;color:var(--success);">₹${order.paidAmount || 0}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:2px solid rgba(0,0,0,0.1);">
+              <span style="color:var(--text);font-weight:700;font-size:14px;">Balance Due</span>
+              <span style="font-weight:800;font-size:18px;color:var(--orange);">₹${(order.totalAmount || 0) - (order.paidAmount || 0)}</span>
+            </div>
+          </div>
+          
+          <div style="text-align:center;margin-top:24px;padding-top:24px;border-top:1px solid var(--border);">
+            <p style="font-size:12px;color:var(--text3);">
+              This tracking link expires on ${formatDate(order.trackingExpiry)}
+            </p>
+          </div>
+        </div>`;
+    }
+  }
+  
+  document.body.appendChild(trackingPage);
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   initApp();
 });
