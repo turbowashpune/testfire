@@ -8,6 +8,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>TurboWash Laundry</title>
+
+<!-- Open Graph / WhatsApp Preview -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="TurboWash Laundry">
+<meta property="og:description" content="Track your laundry order">
+<meta property="og:site_name" content="TurboWash Laundry">
+
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -2061,6 +2068,14 @@ function renderOrderForm(order, prefillCustomer) {
     <div class="form-section">
       <div class="form-section-title">💰 Payment</div>
       <div class="payment-summary" id="paymentSummary">
+        <div class="pay-row"><span>Subtotal</span><strong id="ps_subtotal">₹0.00</strong></div>
+        <div class="pay-row">
+          <span>Discount</span>
+          <input type="number" id="f_discount" value="${order?order.discount||0:0}" min="0" step="1"
+            style="width:80px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:6px 10px;color:white;text-align:right;font-size:14px;font-weight:700;"
+            oninput="updatePaymentSummary()" placeholder="0">
+        </div>
+        <hr class="pay-divider">
         <div class="pay-row"><span>Total Amount</span><strong id="ps_total">₹0.00</strong></div>
         <hr class="pay-divider">
         <div class="pay-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
@@ -2178,86 +2193,215 @@ function renderServiceItems(serviceId, serviceName, pricingType, existingItems) 
   const svc = services.find(s => s.id === serviceId);
   const savedItems = svc ? (svc.items || []) : [];
 
-  serviceItemsData[serviceId] = existingItems && existingItems.length > 0 ? existingItems : [{ name:'', qty:1, price:'', subtotal:0 }];
+  serviceItemsData[serviceId] = existingItems && existingItems.length > 0 ? existingItems : [{ name:'', qty:1, price:'', subtotal:0, details:'', discount:0 }];
 
   const calcSub = (item) => Math.max(0, ((parseFloat(item.qty)||1)*(parseFloat(item.price)||0)) - (parseFloat(item.discount)||0));
 
   const renderTable = () => {
     const items = serviceItemsData[serviceId];
-    return `<div id="svc_${serviceId}" style="margin-bottom:16px;background:var(--card2);border-radius:12px;padding:10px;border:1px solid var(--border);">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <span style="font-weight:700;font-size:13px;color:var(--orange);">${serviceName}</span>
-        <span style="font-size:11px;color:var(--text2);">${pricingType==='per_kg'?'Per KG':'Per Item'}</span>
+    return `<div id="svc_${serviceId}" style="margin-bottom:16px;background:var(--card2);border-radius:12px;padding:12px;border:1px solid var(--border);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <span style="font-weight:700;font-size:14px;color:var(--orange);">${serviceName}</span>
+        <span style="font-size:11px;color:var(--text2);background:rgba(255,107,0,0.1);padding:4px 8px;border-radius:6px;">${pricingType==='per_kg'?'Per KG':'Per Item'}</span>
       </div>
-      <div style="overflow-x:auto;">
-      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:340px;">
-        <thead>
-          <tr style="background:rgba(255,107,0,0.08);">
-            <th style="padding:6px 4px;text-align:left;font-size:10px;color:var(--text2);font-weight:700;min-width:90px;">ITEM</th>
-            <th style="padding:6px 4px;text-align:center;font-size:10px;color:var(--text2);font-weight:700;width:80px;">${pricingType==='per_kg'?'KG':'QTY'}</th>
-            <th style="padding:6px 4px;text-align:center;font-size:10px;color:var(--text2);font-weight:700;width:65px;">PRICE</th>
-            <th style="padding:6px 4px;text-align:center;font-size:10px;color:var(--text2);font-weight:700;width:55px;">DISC(₹)</th>
-            <th style="padding:6px 4px;text-align:right;font-size:10px;color:var(--orange);font-weight:700;width:50px;">SUB</th>
-            <th style="width:24px;"></th>
-          </tr>
-        </thead>
-        <tbody>
-          ${items.map((item,i) => `<tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:5px 4px;">
-              <input list="items_${serviceId}_${i}" type="text" value="${item.name||''}"
-                onchange="updateItemField('${serviceId}',${i},'name',this.value);autoFillPriceOnChange('${serviceId}',${i},'${serviceName}')"
-                oninput="updateItemField('${serviceId}',${i},'name',this.value)"
-                placeholder="${getServicePlaceholder(serviceId)}"
-                style="width:100%;min-width:85px;border:1px solid var(--border);border-radius:5px;padding:5px 6px;font-size:12px;font-family:'Poppins',sans-serif;outline:none;box-sizing:border-box;">
-              <datalist id="items_${serviceId}_${i}">
-                ${savedItems.map(si=>`<option value="${si.name}">`).join('')}
-              </datalist>
-            </td>
-            <td style="padding:5px 4px;">
+      
+      ${items.map((item,i) => `
+        <div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px;">
+          <!-- Row 1: Item Dropdown, Quantity, Remove -->
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+            <div style="flex:1;position:relative;">
+              <select id="itemSelect_${serviceId}_${i}" 
+                onchange="handleItemSelection('${serviceId}',${i},this.value,'${serviceName}','${pricingType}')"
+                style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:'Poppins',sans-serif;background:white;cursor:pointer;outline:none;">
+                <option value="">Select Item...</option>
+                ${savedItems.map(si=>`<option value="${si.name}" ${item.name===si.name?'selected':''}>${si.name} (₹${si.price})</option>`).join('')}
+                <option value="__ADD_CUSTOM__" style="color:var(--orange);font-weight:700;">+ Add Custom Item</option>
+              </select>
+            </div>
+            
+            <div style="display:flex;align-items:center;gap:4px;">
               ${pricingType==='per_kg' ? `
                 <input type="number" min="0.1" step="0.1" value="${item.qty||1}"
                   onchange="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||0.1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                   oninput="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||0.1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                   placeholder="KG"
-                  style="width:52px;text-align:center;border:1.5px solid var(--orange);border-radius:6px;padding:5px 4px;font-size:13px;font-weight:700;color:var(--orange);">
+                  style="width:70px;text-align:center;border:1.5px solid var(--orange);border-radius:6px;padding:8px 4px;font-size:13px;font-weight:700;color:var(--orange);">
+                <span style="font-size:11px;color:var(--text2);font-weight:600;">KG</span>
               ` : `
-                <div style="display:flex;align-items:center;gap:1px;justify-content:center;">
-                  <button onclick="changeQty('${serviceId}',${i},-1)" style="width:20px;height:20px;border-radius:4px;border:1px solid var(--border);background:white;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;">−</button>
-                  <input type="number" min="1" step="1" value="${item.qty||1}"
-                    onchange="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
-                    oninput="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
-                    style="width:32px;text-align:center;border:1px solid var(--border);border-radius:4px;padding:3px 1px;font-size:12px;">
-                  <button onclick="changeQty('${serviceId}',${i},1)" style="width:20px;height:20px;border-radius:4px;border:none;background:var(--orange);color:white;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;">+</button>
-                </div>
+                <button onclick="changeQty('${serviceId}',${i},-1)" style="width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:white;cursor:pointer;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;">−</button>
+                <input type="number" min="1" step="1" value="${item.qty||1}"
+                  onchange="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                  oninput="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                  style="width:40px;text-align:center;border:1.5px solid var(--border);border-radius:6px;padding:6px 4px;font-size:14px;font-weight:700;">
+                <button onclick="changeQty('${serviceId}',${i},1)" style="width:28px;height:28px;border-radius:6px;border:none;background:var(--orange);color:white;cursor:pointer;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;">+</button>
               `}
-            </td>
-            <td style="padding:5px 4px;">
+            </div>
+            
+            <button onclick="removeItemRow('${serviceId}',${i})" style="background:rgba(244,67,54,0.1);border:1.5px solid rgba(244,67,54,0.3);border-radius:8px;padding:8px 10px;cursor:pointer;color:var(--danger);font-size:16px;">🗑</button>
+          </div>
+          
+          <!-- Row 2: Details, Price, Discount, Total -->
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div style="flex:1;">
+              <input type="text" value="${item.details||''}" maxlength="200"
+                onchange="updateItemField('${serviceId}',${i},'details',this.value)"
+                oninput="updateItemField('${serviceId}',${i},'details',this.value)"
+                placeholder="Details: color, brand, notes..."
+                style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:'Poppins',sans-serif;outline:none;">
+            </div>
+            
+            <div style="display:flex;gap:6px;align-items:center;">
+              <span style="font-size:11px;color:var(--text2);font-weight:600;">Price</span>
               <input type="number" min="0" step="0.5" value="${item.price||''}"
                 onchange="updateItemField('${serviceId}',${i},'price',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                 oninput="updateItemField('${serviceId}',${i},'price',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                 placeholder="0"
-                style="width:100%;border:1px solid var(--border);border-radius:5px;padding:5px 4px;font-size:12px;text-align:center;">
-            </td>
-            <td style="padding:5px 4px;">
+                style="width:60px;border:1.5px solid var(--border);border-radius:6px;padding:6px 4px;font-size:13px;text-align:center;font-weight:700;">
+            </div>
+            
+            <div style="display:flex;gap:6px;align-items:center;">
+              <span style="font-size:11px;color:#0277BD;font-weight:600;">Disc</span>
               <input type="number" min="0" step="1" value="${item.discount||0}"
                 onchange="updateItemField('${serviceId}',${i},'discount',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                 oninput="updateItemField('${serviceId}',${i},'discount',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                 placeholder="0"
-                style="width:100%;border:1px solid #29B6F6;border-radius:5px;padding:5px 4px;font-size:12px;text-align:center;color:#0277BD;">
-            </td>
-            <td style="padding:5px 4px;text-align:right;font-weight:800;font-size:13px;color:var(--orange);white-space:nowrap;">₹${calcSub(item).toFixed(0)}</td>
-            <td style="padding:5px 2px;"><button onclick="removeItemRow('${serviceId}',${i})" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:14px;padding:2px;">🗑</button></td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-      </div>
-      <button class="add-item-btn" onclick="addItemRow('${serviceId}','${serviceName}','${pricingType}')">+ Add Item</button>
+                style="width:50px;border:1.5px solid #29B6F6;border-radius:6px;padding:6px 4px;font-size:13px;text-align:center;font-weight:700;color:#0277BD;">
+            </div>
+            
+            <div style="min-width:70px;text-align:right;padding:6px 8px;background:rgba(255,107,0,0.1);border-radius:8px;border:1.5px solid rgba(255,107,0,0.2);">
+              <div style="font-size:9px;color:var(--text3);font-weight:600;">Total</div>
+              <div style="font-weight:800;font-size:15px;color:var(--orange);" id="itemTotal_${serviceId}_${i}">₹${calcSub(item).toFixed(0)}</div>
+            </div>
+          </div>
+        </div>
+      `).join('')}
+      
+      <button class="add-item-btn" onclick="addItemRow('${serviceId}','${serviceName}','${pricingType}')" style="width:100%;padding:10px;background:rgba(255,107,0,0.1);border:1.5px dashed var(--orange);border-radius:8px;color:var(--orange);font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+        <span style="font-size:16px;">+</span> Add Another Item
+      </button>
     </div>`;
   };
 
   const div = document.createElement('div');
   div.innerHTML = renderTable();
   container.appendChild(div.firstElementChild);
+}
+
+// Handle item selection from dropdown
+function handleItemSelection(serviceId, rowIndex, selectedValue, serviceName, pricingType) {
+  if (selectedValue === '__ADD_CUSTOM__') {
+    // Show custom item dialog
+    showAddCustomItemDialog(serviceId, rowIndex, serviceName, pricingType);
+  } else if (selectedValue) {
+    // Auto-fill from saved item
+    const services = DB.get('services') || [];
+    const svc = services.find(s => s.id === serviceId);
+    if (svc && svc.items) {
+      const match = svc.items.find(i => i.name === selectedValue);
+      if (match) {
+        serviceItemsData[serviceId][rowIndex].name = match.name;
+        serviceItemsData[serviceId][rowIndex].price = match.price;
+        renderServiceItems(serviceId, serviceName, pricingType, serviceItemsData[serviceId]);
+        updatePaymentSummary();
+      }
+    }
+  } else {
+    // Clear selection
+    serviceItemsData[serviceId][rowIndex].name = '';
+    serviceItemsData[serviceId][rowIndex].price = '';
+    renderServiceItems(serviceId, serviceName, pricingType, serviceItemsData[serviceId]);
+    updatePaymentSummary();
+  }
+}
+
+// Show dialog to add custom item
+function showAddCustomItemDialog(serviceId, rowIndex, serviceName, pricingType) {
+  const dialog = `
+    <div style="background:white;border-radius:16px;padding:24px;max-width:400px;width:100%;">
+      <h3 style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:8px;">Add Custom Item</h3>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:20px;">This item will be saved to <strong>${serviceName}</strong> for future orders.</p>
+      
+      <div style="margin-bottom:16px;">
+        <label style="display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">Item Name *</label>
+        <input type="text" id="customItemName" placeholder="e.g., Blue Jeans, White Formal Shirt"
+          style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;">
+      </div>
+      
+      <div style="margin-bottom:20px;">
+        <label style="display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">Price (₹) *</label>
+        <input type="number" id="customItemPrice" min="0" step="0.5" placeholder="0"
+          style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;">
+      </div>
+      
+      <div style="display:flex;gap:10px;">
+        <button onclick="closeModal('customItemModal')" 
+          style="flex:1;padding:12px;background:var(--card2);border:1.5px solid var(--border);border-radius:8px;font-weight:700;cursor:pointer;">
+          Cancel
+        </button>
+        <button onclick="saveCustomItem('${serviceId}',${rowIndex},'${serviceName}','${pricingType}')"
+          style="flex:1;padding:12px;background:var(--orange);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;">
+          Save Item
+        </button>
+      </div>
+    </div>`;
+  
+  const modal = document.getElementById('customItemModal');
+  if (!modal) {
+    const newModal = document.createElement('div');
+    newModal.id = 'customItemModal';
+    newModal.className = 'modal';
+    newModal.innerHTML = `<div class="modal-content">${dialog}</div>`;
+    document.body.appendChild(newModal);
+  } else {
+    modal.querySelector('.modal-content').innerHTML = dialog;
+  }
+  
+  openModal('customItemModal');
+  setTimeout(() => document.getElementById('customItemName').focus(), 100);
+}
+
+// Save custom item to service master list
+function saveCustomItem(serviceId, rowIndex, serviceName, pricingType) {
+  const name = document.getElementById('customItemName').value.trim();
+  const price = parseFloat(document.getElementById('customItemPrice').value);
+  
+  if (!name) {
+    showToast('Please enter item name', 'warning');
+    return;
+  }
+  
+  if (!price || price <= 0) {
+    showToast('Please enter valid price', 'warning');
+    return;
+  }
+  
+  // Add to service's master item list
+  const services = DB.get('services') || [];
+  const svcIndex = services.findIndex(s => s.id === serviceId);
+  
+  if (svcIndex !== -1) {
+    if (!services[svcIndex].items) services[svcIndex].items = [];
+    
+    // Check if already exists
+    const exists = services[svcIndex].items.find(i => i.name.toLowerCase() === name.toLowerCase());
+    if (exists) {
+      showToast('Item already exists in this service', 'warning');
+      return;
+    }
+    
+    services[svcIndex].items.push({ name, price });
+    DB.set('services', services);
+    
+    // Add to current order
+    serviceItemsData[serviceId][rowIndex].name = name;
+    serviceItemsData[serviceId][rowIndex].price = price;
+    
+    closeModal('customItemModal');
+    renderServiceItems(serviceId, serviceName, pricingType, serviceItemsData[serviceId]);
+    updatePaymentSummary();
+    
+    showToast(`✅ "${name}" added to ${serviceName}`, 'success');
+  }
 }
 
 function autoFillPrice(serviceId, rowIndex, serviceName) {
@@ -2340,12 +2484,13 @@ function changeQty(serviceId, rowIndex, delta) {
   const current = parseFloat(serviceItemsData[serviceId][rowIndex].qty) || 1;
   const newQty = Math.max(1, Math.round(current + delta));
   serviceItemsData[serviceId][rowIndex].qty = newQty;
-  // Update qty input value directly without re-rendering
+  
+  // Update qty input value directly in the new div-based layout
   const svcEl = document.getElementById('svc_' + serviceId);
   if (svcEl) {
-    const rows = svcEl.querySelectorAll('tbody tr');
-    if (rows[rowIndex]) {
-      const qtyInput = rows[rowIndex].querySelector('input[type="number"]');
+    const itemCards = svcEl.querySelectorAll('div[style*="background:white"]');
+    if (itemCards[rowIndex]) {
+      const qtyInput = itemCards[rowIndex].querySelector('input[type="number"][min="1"]');
       if (qtyInput) qtyInput.value = newQty;
     }
   }
@@ -2385,7 +2530,7 @@ function getAutoName(serviceId, pricingType) {
 function addItemRow(serviceId, serviceName, pricingType) {
   const autoName = getAutoName(serviceId, pricingType);
   const autoPrice = getDefaultPrice(serviceId);
-  serviceItemsData[serviceId].push({ name:autoName, qty:1, price:autoPrice, subtotal:0, discount:0 });
+  serviceItemsData[serviceId].push({ name:autoName, qty:1, price:autoPrice, subtotal:0, details:'', discount:0 });
   renderServiceItems(serviceId, serviceName, pricingType, serviceItemsData[serviceId]);
   updatePaymentSummary();
 }
@@ -2424,14 +2569,11 @@ function updateSubDisplay(serviceId, rowIndex) {
   const item = (serviceItemsData[serviceId]||[])[rowIndex];
   if (!item) return;
   const sub = calcItemSub(item);
-  // Find sub cell: each row has 6 cells, sub is 5th (index 4)
-  const tableId = 'svc_' + serviceId;
-  const svcEl = document.getElementById(tableId);
-  if (!svcEl) return;
-  const rows = svcEl.querySelectorAll('tbody tr');
-  if (rows[rowIndex]) {
-    const cells = rows[rowIndex].querySelectorAll('td');
-    if (cells[4]) cells[4].textContent = '₹' + sub.toFixed(0);
+  
+  // Update the total display in the new div-based layout
+  const totalEl = document.getElementById('itemTotal_' + serviceId + '_' + rowIndex);
+  if (totalEl) {
+    totalEl.textContent = '₹' + sub.toFixed(0);
   }
 }
 
@@ -2444,12 +2586,16 @@ function calcOrderTotal() {
 }
 
 function updatePaymentSummary() {
-  let total = 0;
+  let subtotal = 0;
   Object.values(serviceItemsData).forEach(items => {
-    items.forEach(item => { total += calcItemSub(item); });
+    items.forEach(item => { subtotal += calcItemSub(item); });
   });
+  const discount = parseFloat(document.getElementById('f_discount')?.value) || 0;
+  const total = Math.max(0, subtotal - discount);
   const advance = parseFloat(document.getElementById('f_advancePaid')?.value) || 0;
   const balance = Math.max(0, total - advance);
+  
+  if(document.getElementById('ps_subtotal')) document.getElementById('ps_subtotal').textContent = '₹' + subtotal.toFixed(2);
   if(document.getElementById('ps_total')) document.getElementById('ps_total').textContent = '₹' + total.toFixed(2);
   if(document.getElementById('ps_balance')) document.getElementById('ps_balance').textContent = '₹' + balance.toFixed(2);
 }
@@ -2530,6 +2676,8 @@ function saveOrder() {
   });
 
   const totalAmount = orderServices.reduce((sum, s) => sum + s.serviceTotal, 0);
+  const discount = parseFloat(document.getElementById('f_discount').value) || 0;
+  const finalTotal = Math.max(0, totalAmount - discount);
   const paidAmount = parseFloat(document.getElementById('f_advancePaid').value) || 0;
   const paymentMode = document.getElementById('f_paymentMode').value;
   const notes = document.getElementById('f_notes').value.trim();
@@ -2550,7 +2698,7 @@ function saveOrder() {
       orders[idx] = {
         ...orders[idx],
         customerName: name, customerPhone: phone, customerPhone2: phone2, customerAddress: address,
-        orderDate, dueDate, services: orderServices, totalAmount, paidAmount, paymentMode, notes,
+        orderDate, dueDate, services: orderServices, subtotal: totalAmount, discount, totalAmount: finalTotal, paidAmount, paymentMode, notes,
         updatedAt: new Date().toISOString(), updatedBy: currentUser.name
       };
     }
@@ -2566,7 +2714,7 @@ function saveOrder() {
     const newOrder = {
       id: 'ord_' + Date.now(), orderNo, orderDate, dueDate,
       customerName: name, customerPhone: phone, customerPhone2: phone2, customerAddress: address,
-      services: orderServices, totalAmount, paidAmount, paymentMode, notes,
+      services: orderServices, subtotal: totalAmount, discount, totalAmount: finalTotal, paidAmount, paymentMode, notes,
       status: 'received',
       trackingCode: generateTrackingCode('ord_' + Date.now()),
       trackingExpiry: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
@@ -2652,15 +2800,21 @@ function showOrderDetail(orderId) {
           <th style="padding:5px 8px;text-align:left;">Item</th>
           <th style="padding:5px 8px;text-align:center;">Qty</th>
           <th style="padding:5px 8px;text-align:right;">Price</th>
+          <th style="padding:5px 8px;text-align:right;color:#0277BD;">Disc</th>
           <th style="padding:5px 8px;text-align:right;">Sub</th>
         </tr>
-        ${(svc.items||[]).map(item => `<tr>
-          <td style="padding:5px 8px;border-bottom:1px solid var(--border);">${item.name||'-'}</td>
-          <td style="padding:5px 8px;text-align:center;border-bottom:1px solid var(--border);">${item.qty||1}</td>
-          <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);">₹${item.price||0}</td>
-          <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);font-weight:700;">₹${((item.qty||1)*(item.price||0)).toFixed(0)}</td>
-        </tr>`).join('')}
-        <tr><td colspan="3" style="padding:5px 8px;font-weight:700;text-align:right;">Service Total:</td>
+        ${(svc.items||[]).map(item => {
+          const disc = parseFloat(item.discount)||0;
+          const subtotal = Math.max(0, ((item.qty||1)*(item.price||0)) - disc);
+          return `<tr>
+            <td style="padding:5px 8px;border-bottom:1px solid var(--border);">${item.name||'-'}${item.details ? '<br><span style="font-size:10px;color:#999;">'+item.details+'</span>' : ''}</td>
+            <td style="padding:5px 8px;text-align:center;border-bottom:1px solid var(--border);">${item.qty||1}</td>
+            <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);">₹${item.price||0}</td>
+            <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);color:#0277BD;">${disc > 0 ? '₹'+disc : '-'}</td>
+            <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);font-weight:700;">₹${subtotal.toFixed(0)}</td>
+          </tr>`;
+        }).join('')}
+        <tr><td colspan="4" style="padding:5px 8px;font-weight:700;text-align:right;">Service Total:</td>
           <td style="padding:5px 8px;text-align:right;font-weight:800;color:var(--orange);">₹${(svc.serviceTotal||0).toFixed(0)}</td></tr>
       </table>
     </div>`).join('');
@@ -2702,6 +2856,9 @@ function showOrderDetail(orderId) {
     </div>
 
     <div style="background:var(--dark);border-radius:12px;padding:14px;margin-bottom:12px;color:white;">
+      <div class="inv-total-row"><span>Subtotal</span><strong>₹${(order.subtotal||order.totalAmount||0).toFixed(2)}</strong></div>
+      ${(order.discount && order.discount > 0) ? `<div class="inv-total-row"><span>Discount</span><strong style="color:#69f0ae;">- ₹${order.discount.toFixed(2)}</strong></div>` : `<div class="inv-total-row"><span>Discount</span><strong style="opacity:0.5;">N/A</strong></div>`}
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.2);margin:8px 0;">
       <div class="inv-total-row"><span>Total Amount</span><strong>₹${(order.totalAmount||0).toFixed(2)}</strong></div>
       <div class="inv-total-row"><span>Advance Paid</span><strong>₹${(order.paidAmount||0).toFixed(2)}</strong></div>
       <div class="inv-total-row" style="color:${balance>0?'#ff8a80':'#69f0ae'};font-weight:800;">
@@ -3006,7 +3163,7 @@ function showInvoice(orderId) {
       const disc = parseFloat(item.discount)||0;
       const sub = Math.max(0,((parseFloat(item.qty)||1)*(parseFloat(item.price)||0))-disc);
       return `<tr>
-        <td style="padding:4px 8px;">${item.name||'-'}</td>
+        <td style="padding:4px 8px;">${item.name||'-'}${item.details ? '<br><span style="font-size:10px;color:#999;">'+item.details+'</span>' : ''}</td>
         <td style="padding:4px 8px;text-align:center;">${item.qty||1}</td>
         <td style="padding:4px 8px;text-align:right;">₹${item.price||0}</td>
         <td style="padding:4px 8px;text-align:right;color:#0277BD;">${disc>0?'-₹'+disc:'-'}</td>
@@ -3047,6 +3204,9 @@ function showInvoice(orderId) {
         <tbody>${servicesHtml}</tbody>
       </table>
       <div class="inv-total">
+        <div class="inv-total-row"><span>Subtotal</span><strong>₹${(order.subtotal||order.totalAmount||0).toFixed(2)}</strong></div>
+        ${(order.discount && order.discount > 0) ? `<div class="inv-total-row"><span>Discount</span><strong style="color:#4CAF50;">- ₹${order.discount.toFixed(2)}</strong></div>` : `<div class="inv-total-row"><span>Discount</span><strong style="opacity:0.5;">N/A</strong></div>`}
+        <hr style="border:none;border-top:2px solid #eee;margin:8px 0;">
         <div class="inv-total-row"><span>Total Amount</span><strong>₹${(order.totalAmount||0).toFixed(2)}</strong></div>
         <div class="inv-total-row"><span>Advance Paid</span><strong>₹${(order.paidAmount||0).toFixed(2)}</strong></div>
         <div class="inv-total-row main"><span>${balance>0?'Balance Due':'Amount Paid'}</span><strong>₹${balance>0?balance.toFixed(2):(order.totalAmount||0).toFixed(2)}</strong></div>
@@ -4640,9 +4800,6 @@ function showToast(msg, type) {
 // ORDER TRACKING PAGE
 // ============================================================
 function showTrackingPage(trackingCode) {
-  const orders = DB.get('orders') || [];
-  const order = orders.find(o => o.trackingCode === trackingCode);
-  
   document.getElementById('mainApp').style.display = 'none';
   document.getElementById('loginPage').style.display = 'none';
   
@@ -4650,103 +4807,128 @@ function showTrackingPage(trackingCode) {
   trackingPage.id = 'trackingPage';
   trackingPage.style.cssText = 'min-height:100vh;background:linear-gradient(135deg,#1A1A2E,#16213E);padding:20px;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;';
   
-  if (!order) {
-    trackingPage.innerHTML = `
-      <div style="background:white;border-radius:20px;padding:40px;max-width:500px;text-align:center;">
-        <div style="font-size:64px;margin-bottom:16px;">❌</div>
-        <h2 style="font-weight:800;font-size:24px;color:#333;margin-bottom:12px;">Order Not Found</h2>
-        <p style="color:#666;font-size:14px;margin-bottom:24px;">This tracking code is invalid or has expired.</p>
-        <div style="font-size:12px;color:#999;">Tracking code: <strong>${trackingCode}</strong></div>
-      </div>`;
-  } else {
-    const isExpired = order.trackingExpiry && new Date() > new Date(order.trackingExpiry);
-    
-    if (isExpired) {
-      trackingPage.innerHTML = `
-        <div style="background:white;border-radius:20px;padding:40px;max-width:500px;text-align:center;">
-          <div style="font-size:64px;margin-bottom:16px;">⏰</div>
-          <h2 style="font-weight:800;font-size:24px;color:#333;margin-bottom:12px;">Tracking Link Expired</h2>
-          <p style="color:#666;font-size:14px;margin-bottom:24px;">
-            This tracking link expired after 60 days.<br>Please contact us for order status.
-          </p>
-          <div style="font-size:12px;color:#999;">Order: <strong>${order.orderNo}</strong></div>
-        </div>`;
-    } else {
-      const statusLabels = {
-        received:'Received',
-        inprogress:'In-Progress',
-        ready:'Ready',
-        paid_delivered:'Delivered & Paid',
-        unpaid_delivered:'Delivered (Payment Pending)',
-        cancelled:'Cancelled'
-      };
-      
-      const statusColors = {
-        received:'#2196F3',
-        inprogress:'#FF9800',
-        ready:'#4CAF50',
-        paid_delivered:'#4CAF50',
-        unpaid_delivered:'#FF9800',
-        cancelled:'#F44336'
-      };
-      
-      const currentColor = statusColors[order.status] || '#666';
-      const statusLabel = statusLabels[order.status] || order.status;
-      const isDelivered = ['paid_delivered','unpaid_delivered'].includes(order.status);
-      
-      trackingPage.innerHTML = `
-        <div style="background:white;border-radius:20px;padding:32px;max-width:600px;width:100%;">
-          <div style="text-align:center;margin-bottom:32px;">
-            <h2 style="font-weight:800;font-size:28px;color:#333;margin-bottom:8px;">Order ${order.orderNo}</h2>
-            <p style="color:#666;font-size:14px;">${order.customerName}</p>
-          </div>
-          
-          <div style="background:${currentColor};color:white;border-radius:16px;padding:24px;margin-bottom:24px;text-align:center;">
-            <div style="font-size:48px;margin-bottom:12px;">
-              ${isDelivered ? '🎉' : order.status === 'ready' ? '✅' : order.status === 'inprogress' ? '⏳' : '📦'}
-            </div>
-            <div style="font-weight:800;font-size:24px;margin-bottom:8px;">${statusLabel}</div>
-            ${!isDelivered ? `<div style="font-size:14px;opacity:0.9;">Expected Ready: ${formatDate(order.dueDate)}</div>` : ''}
-          </div>
-          
-          <div style="margin-bottom:24px;">
-            <div style="font-weight:700;font-size:13px;color:#666;margin-bottom:12px;text-transform:uppercase;">Order Timeline</div>
-            ${(order.statusHistory || []).map((h, i) => `
-              <div style="display:flex;gap:12px;margin-bottom:12px;align-items:start;">
-                <div style="width:32px;height:32px;border-radius:50%;background:${i === order.statusHistory.length - 1 ? currentColor : '#E0E0E0'};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;">
-                  ${i === order.statusHistory.length - 1 ? '●' : '✓'}
-                </div>
-                <div style="flex:1;">
-                  <div style="font-weight:700;font-size:14px;color:#333;">${statusLabels[h.status] || h.status}</div>
-                  <div style="font-size:12px;color:#999;">${formatDateTime(h.changedAt)}</div>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-          
-          <div style="background:rgba(255,107,0,0.08);border-radius:12px;padding:16px;">
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-              <span style="color:#666;font-size:13px;">Total Amount</span>
-              <span style="font-weight:700;font-size:15px;color:#333;">₹${order.totalAmount}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-              <span style="color:#666;font-size:13px;">Paid</span>
-              <span style="font-weight:700;font-size:15px;color:#4CAF50;">₹${order.paidAmount || 0}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:2px solid rgba(0,0,0,0.1);">
-              <span style="color:#333;font-weight:700;font-size:14px;">Balance Due</span>
-              <span style="font-weight:800;font-size:18px;color:#FF6B00;">₹${(order.totalAmount || 0) - (order.paidAmount || 0)}</span>
-            </div>
-          </div>
-          
-          <div style="text-align:center;margin-top:24px;padding-top:24px;border-top:1px solid #ddd;">
-            <p style="font-size:12px;color:#999;">Link expires: ${formatDate(order.trackingExpiry)}</p>
-          </div>
-        </div>`;
-    }
-  }
+  // Show loading
+  trackingPage.innerHTML = `
+    <div style="background:white;border-radius:20px;padding:40px;max-width:500px;text-align:center;">
+      <div style="font-size:48px;margin-bottom:16px;">⏳</div>
+      <h2 style="font-weight:800;font-size:24px;color:#333;margin-bottom:12px;">Loading...</h2>
+      <p style="color:#666;font-size:14px;">Fetching order details</p>
+    </div>`;
   
   document.body.appendChild(trackingPage);
+  
+  // Fetch from Firebase (cloud), not localStorage
+  firestore.collection('orders').where('trackingCode', '==', trackingCode).limit(1).get()
+    .then(snapshot => {
+      if (snapshot.empty) {
+        // Order not found
+        trackingPage.innerHTML = `
+          <div style="background:white;border-radius:20px;padding:40px;max-width:500px;text-align:center;">
+            <div style="font-size:64px;margin-bottom:16px;">❌</div>
+            <h2 style="font-weight:800;font-size:24px;color:#333;margin-bottom:12px;">Order Not Found</h2>
+            <p style="color:#666;font-size:14px;margin-bottom:24px;">This tracking code is invalid or has expired.</p>
+            <div style="font-size:12px;color:#999;">Tracking code: <strong>${trackingCode}</strong></div>
+          </div>`;
+        return;
+      }
+      
+      const order = snapshot.docs[0].data();
+      const isExpired = order.trackingExpiry && new Date() > new Date(order.trackingExpiry);
+      
+      if (isExpired) {
+        trackingPage.innerHTML = `
+          <div style="background:white;border-radius:20px;padding:40px;max-width:500px;text-align:center;">
+            <div style="font-size:64px;margin-bottom:16px;">⏰</div>
+            <h2 style="font-weight:800;font-size:24px;color:#333;margin-bottom:12px;">Tracking Link Expired</h2>
+            <p style="color:#666;font-size:14px;margin-bottom:24px;">
+              This tracking link expired after 60 days.<br>Please contact us for order status.
+            </p>
+            <div style="font-size:12px;color:#999;">Order: <strong>${order.orderNo}</strong></div>
+          </div>`;
+      } else {
+        const statusLabels = {
+          received:'Received',
+          inprogress:'In-Progress',
+          ready:'Ready',
+          paid_delivered:'Delivered & Paid',
+          unpaid_delivered:'Delivered (Payment Pending)',
+          cancelled:'Cancelled'
+        };
+        
+        const statusColors = {
+          received:'#2196F3',
+          inprogress:'#FF9800',
+          ready:'#4CAF50',
+          paid_delivered:'#4CAF50',
+          unpaid_delivered:'#FF9800',
+          cancelled:'#F44336'
+        };
+        
+        const currentColor = statusColors[order.status] || '#666';
+        const statusLabel = statusLabels[order.status] || order.status;
+        const isDelivered = ['paid_delivered','unpaid_delivered'].includes(order.status);
+        
+        trackingPage.innerHTML = `
+          <div style="background:white;border-radius:20px;padding:32px;max-width:600px;width:100%;">
+            <div style="text-align:center;margin-bottom:32px;">
+              <h2 style="font-weight:800;font-size:28px;color:#333;margin-bottom:8px;">Order ${order.orderNo}</h2>
+              <p style="color:#666;font-size:14px;">${order.customerName}</p>
+            </div>
+            
+            <div style="background:${currentColor};color:white;border-radius:16px;padding:24px;margin-bottom:24px;text-align:center;">
+              <div style="font-size:48px;margin-bottom:12px;">
+                ${isDelivered ? '🎉' : order.status === 'ready' ? '✅' : order.status === 'inprogress' ? '⏳' : '📦'}
+              </div>
+              <div style="font-weight:800;font-size:24px;margin-bottom:8px;">${statusLabel}</div>
+              ${!isDelivered ? `<div style="font-size:14px;opacity:0.9;">Expected Ready: ${formatDate(order.dueDate)}</div>` : ''}
+            </div>
+            
+            <div style="margin-bottom:24px;">
+              <div style="font-weight:700;font-size:13px;color:#666;margin-bottom:12px;text-transform:uppercase;">Order Timeline</div>
+              ${(order.statusHistory || []).map((h, i) => `
+                <div style="display:flex;gap:12px;margin-bottom:12px;align-items:start;">
+                  <div style="width:32px;height:32px;border-radius:50%;background:${i === order.statusHistory.length - 1 ? currentColor : '#E0E0E0'};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;">
+                    ${i === order.statusHistory.length - 1 ? '●' : '✓'}
+                  </div>
+                  <div style="flex:1;">
+                    <div style="font-weight:700;font-size:14px;color:#333;">${statusLabels[h.status] || h.status}</div>
+                    <div style="font-size:12px;color:#999;">${formatDateTime(h.changedAt)}</div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            
+            <div style="background:rgba(255,107,0,0.08);border-radius:12px;padding:16px;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                <span style="color:#666;font-size:13px;">Total Amount</span>
+                <span style="font-weight:700;font-size:15px;color:#333;">₹${order.totalAmount}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                <span style="color:#666;font-size:13px;">Paid</span>
+                <span style="font-weight:700;font-size:15px;color:#4CAF50;">₹${order.paidAmount || 0}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:2px solid rgba(0,0,0,0.1);">
+                <span style="color:#333;font-weight:700;font-size:14px;">Balance Due</span>
+                <span style="font-weight:800;font-size:18px;color:#FF6B00;">₹${(order.totalAmount || 0) - (order.paidAmount || 0)}</span>
+              </div>
+            </div>
+            
+            <div style="text-align:center;margin-top:24px;padding-top:24px;border-top:1px solid #ddd;">
+              <p style="font-size:12px;color:#999;">Link expires: ${formatDate(order.trackingExpiry)}</p>
+            </div>
+          </div>`;
+      }
+    })
+    .catch(error => {
+      console.error('Tracking fetch error:', error);
+      trackingPage.innerHTML = `
+        <div style="background:white;border-radius:20px;padding:40px;max-width:500px;text-align:center;">
+          <div style="font-size:64px;margin-bottom:16px;">⚠️</div>
+          <h2 style="font-weight:800;font-size:24px;color:#333;margin-bottom:12px;">Error Loading Order</h2>
+          <p style="color:#666;font-size:14px;margin-bottom:24px;">Unable to fetch order details. Please try again later.</p>
+          <div style="font-size:12px;color:#999;">Error: ${error.message}</div>
+        </div>`;
+    });
 }
 
 // ============================================================
