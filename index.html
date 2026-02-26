@@ -593,13 +593,20 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
             <div class="stat-lbl">Unpaid Orders</div>
           </div>
         </div>
-        <!-- Recent Orders -->
+        <!-- Monthly Revenue -->
         <div class="section-header">
-          <h3>Recent Orders</h3>
-          <a onclick="switchPage('pageOrders')">View All ›</a>
+          <h3>This Month's Revenue</h3>
         </div>
-        <div class="recent-orders" id="recentOrdersList">
-          <div class="loading"><div class="spinner"></div></div>
+        <div style="padding:0 16px;">
+          <div class="stat-card" style="background:linear-gradient(135deg,#4CAF50,#66BB6A);color:white;padding:24px;border-radius:16px;box-shadow:0 4px 20px rgba(76,175,80,0.3);">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:13px;opacity:0.9;margin-bottom:8px;">Total Revenue (Last 30 Days)</div>
+                <div style="font-size:32px;font-weight:900;font-family:'Nunito',sans-serif;" id="monthlyRevenue">₹0</div>
+              </div>
+              <div style="font-size:48px;opacity:0.3;">💰</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -607,23 +614,71 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
     <!-- ORDERS PAGE -->
     <div class="page" id="pageOrders">
       <div class="page-content">
-        <div class="search-bar">
-          <div class="search-input-wrap">
-            <span class="search-icon">🔍</span>
-            <input type="text" placeholder="Search by name, phone or order no..." id="orderSearch" oninput="filterOrders()">
+        
+        <!-- Main Tabs: Active | Completed | Archived -->
+        <div style="padding:12px 16px 0;">
+          <div style="display:flex;gap:8px;border-bottom:2px solid #eee;">
+            <div class="main-tab active" id="tabActive" onclick="switchOrderTab('active')" style="flex:1;text-align:center;padding:12px;font-weight:700;cursor:pointer;border-bottom:3px solid var(--orange);color:var(--orange);">
+              Active Orders
+            </div>
+            <div class="main-tab" id="tabCompleted" onclick="switchOrderTab('completed')" style="flex:1;text-align:center;padding:12px;font-weight:700;cursor:pointer;border-bottom:3px solid transparent;color:#999;">
+              Completed
+            </div>
+            <div class="main-tab" id="tabArchived" onclick="switchOrderTab('archived')" style="flex:1;text-align:center;padding:12px;font-weight:700;cursor:pointer;border-bottom:3px solid transparent;color:#999;">
+              Archived
+            </div>
           </div>
         </div>
-        <div class="filter-tabs" id="orderFilterTabs">
-          <div class="filter-tab active" onclick="setOrderFilter('all',this)">All</div>
-          <div class="filter-tab" onclick="setOrderFilter('received',this)">Received</div>
-          <div class="filter-tab" onclick="setOrderFilter('inprogress',this)">In Progress</div>
-          <div class="filter-tab" onclick="setOrderFilter('ready',this)">Ready</div>
-          <div class="filter-tab" onclick="setOrderFilter('delivered',this)">Delivered</div>
-          <div class="filter-tab" onclick="setOrderFilter('cancelled',this)">Cancelled</div>
+
+        <!-- Active Tab Content -->
+        <div id="activeTabContent">
+          <div class="filter-tabs" style="padding:8px 16px;">
+            <div class="filter-tab active" onclick="setOrderFilter('all',this)">All</div>
+            <div class="filter-tab" onclick="setOrderFilter('received',this)">Received</div>
+            <div class="filter-tab" onclick="setOrderFilter('inprogress',this)">In-Progress</div>
+            <div class="filter-tab" onclick="setOrderFilter('ready',this)">Ready</div>
+            <div class="filter-tab" onclick="setOrderFilter('unpaid_delivered',this)">Un-Paid & Delivered</div>
+          </div>
+          <div id="ordersList" style="padding:0 16px; display:flex; flex-direction:column; gap:8px; padding-bottom:20px;">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
         </div>
-        <div id="ordersList" style="padding:0 16px; display:flex; flex-direction:column; gap:8px; padding-bottom:20px;">
-          <div class="loading"><div class="spinner"></div></div>
+
+        <!-- Completed Tab Content -->
+        <div id="completedTabContent" style="display:none;">
+          <div style="padding:12px 16px;">
+            <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
+              <div class="search-input-wrap" style="flex:1;">
+                <span class="search-icon">🔍</span>
+                <input type="text" placeholder="Search completed orders..." id="completedSearch" oninput="filterCompletedOrders()">
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="archiveOldOrders()" style="white-space:nowrap;">
+                📦 Archive
+              </button>
+            </div>
+            <div class="filter-tabs">
+              <div class="filter-tab active" onclick="setCompletedFilter('paid_delivered',this)">Paid & Delivered</div>
+              <div class="filter-tab" onclick="setCompletedFilter('cancelled',this)">Cancelled</div>
+            </div>
+          </div>
+          <div id="completedOrdersList" style="padding:0 16px; display:flex; flex-direction:column; gap:8px; padding-bottom:20px;">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
         </div>
+
+        <!-- Archived Tab Content -->
+        <div id="archivedTabContent" style="display:none;">
+          <div style="padding:12px 16px;">
+            <div class="search-input-wrap">
+              <span class="search-icon">🔍</span>
+              <input type="text" placeholder="Search archived orders..." id="archivedSearch" oninput="filterArchivedOrders()">
+            </div>
+          </div>
+          <div id="archivedOrdersList" style="padding:0 16px; display:flex; flex-direction:column; gap:8px; padding-bottom:20px;">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -1219,6 +1274,8 @@ function getLogo() {
 // ============================================================
 let currentUser = null;
 let currentOrderFilter = 'all';
+let currentOrderTab = 'active'; // active, completed, archived
+let currentCompletedFilter = 'paid_delivered';
 let editingOrderId = null;
 let currentInvoiceOrderId = null;
 let dueDateRefreshInterval = null;
@@ -1291,7 +1348,7 @@ function checkTrackingURL() {
   }
 }
 
-function showTrackingPage(orderNo) {
+function showTrackingPage_OLD_INTERNAL_UNUSED(orderNo) {
   document.getElementById('mainApp').style.display = 'none';
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('trackingPage').style.display = 'block';
@@ -1459,7 +1516,11 @@ function switchPage(pageId) {
   if (navBtn) navBtn.classList.add('active');
 
   if (pageId === 'pageDashboard') refreshDashboard();
-  if (pageId === 'pageOrders') renderOrders();
+  if (pageId === 'pageOrders') {
+    // Initialize with Active tab
+    currentOrderTab = 'active';
+    switchOrderTab('active');
+  }
   if (pageId === 'pageDueDate') renderDueDatePage();
   if (pageId === 'pageCustomers') renderCustomers();
 }
@@ -1484,13 +1545,19 @@ function refreshDashboard() {
 
   if (currentUser.role === 'admin') {
     const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentOrders = orders.filter(o => new Date(o.createdAt) >= thirtyDaysAgo);
+    const recentOrders = orders.filter(o => new Date(o.createdAt) >= thirtyDaysAgo && !o.archived);
     const revenue = recentOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
     const unpaid = orders.filter(o => (o.totalAmount - (o.paidAmount||0)) > 0 && o.status !== 'cancelled');
     document.getElementById('statRevenue').textContent = '₹' + revenue.toFixed(0);
     document.getElementById('statUnpaid').textContent = unpaid.length;
     document.getElementById('statRevenueCard').style.display = '';
     document.getElementById('statUnpaidCard').style.display = '';
+    
+    // Monthly Revenue (for home page)
+    const monthlyRevenueEl = document.getElementById('monthlyRevenue');
+    if (monthlyRevenueEl) {
+      monthlyRevenueEl.textContent = '₹' + revenue.toFixed(0);
+    }
   }
 
   // Overdue banner
@@ -1641,46 +1708,193 @@ function renderOrderCard(order) {
         <div style="font-size:10px;opacity:0.9;">Send notification to customer</div>
       </div>
     </div>` : ''}
+    ${order._oldUnpaid ? `<div style="margin-top:8px;padding:8px 10px;background:rgba(244,67,54,0.1);border:1.5px solid rgba(244,67,54,0.3);border-radius:8px;display:flex;align-items:center;gap:8px;">
+      <span style="font-size:16px;">⚠️</span>
+      <div style="flex:1;">
+        <div style="font-size:11px;font-weight:700;color:var(--danger);">Payment Overdue!</div>
+        <div style="font-size:10px;color:var(--text2);">Delivered ${Math.floor((new Date() - new Date(order.createdAt))/(1000*60*60*24))} days ago</div>
+      </div>
+    </div>` : ''}
   </div>`;
 }
 
 // ============================================================
 // ORDERS PAGE
 // ============================================================
-function renderOrders() {
-  const orders = DB.get('orders') || [];
-  const search = (document.getElementById('orderSearch')||{}).value || '';
-  let filtered = orders;
 
+// Helper: Check if order is older than 30 days
+function isOlderThan30Days(order) {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  return new Date(order.createdAt) < thirtyDaysAgo;
+}
+
+// Switch between main tabs
+function switchOrderTab(tab) {
+  currentOrderTab = tab;
+  
+  // Update tab styles
+  document.querySelectorAll('.main-tab').forEach(t => {
+    t.style.borderBottom = '3px solid transparent';
+    t.style.color = '#999';
+    t.classList.remove('active');
+  });
+  
+  const activeTab = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
+  activeTab.style.borderBottom = '3px solid var(--orange)';
+  activeTab.style.color = 'var(--orange)';
+  activeTab.classList.add('active');
+  
+  // Show/hide content
+  document.getElementById('activeTabContent').style.display = tab === 'active' ? 'block' : 'none';
+  document.getElementById('completedTabContent').style.display = tab === 'completed' ? 'block' : 'none';
+  document.getElementById('archivedTabContent').style.display = tab === 'archived' ? 'block' : 'none';
+  
+  // Render appropriate list
+  if (tab === 'active') renderOrders();
+  else if (tab === 'completed') renderCompletedOrders();
+  else if (tab === 'archived') renderArchivedOrders();
+}
+
+// ACTIVE TAB: Render active orders
+function renderOrders() {
+  const allOrders = DB.get('orders') || [];
+  
+  // Active = received, inprogress, ready, unpaid_delivered
+  let filtered = allOrders.filter(o => ['received','inprogress','ready','unpaid_delivered'].includes(o.status));
+  
+  // Apply status filter
   if (currentOrderFilter !== 'all') {
     filtered = filtered.filter(o => o.status === currentOrderFilter);
   }
-  if (search.trim()) {
-    const q = search.toLowerCase();
+  
+  // Check for old Un-Paid & Delivered orders and add warning
+  filtered = filtered.map(o => {
+    if (o.status === 'unpaid_delivered' && isOlderThan30Days(o)) {
+      o._oldUnpaid = true; // Flag for warning
+    }
+    return o;
+  });
+  
+  filtered.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  const container = document.getElementById('ordersList');
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><h3>No active orders</h3><p>All orders are completed or archived</p></div>';
+  } else {
+    container.innerHTML = filtered.map(o => renderOrderCard(o)).join('');
+  }
+}
+
+// COMPLETED TAB: Render completed orders (last 30 days only)
+function renderCompletedOrders() {
+  const allOrders = DB.get('orders') || [];
+  const searchQuery = (document.getElementById('completedSearch')||{}).value || '';
+  
+  // Completed = paid_delivered, cancelled (last 30 days, not archived)
+  let filtered = allOrders.filter(o => 
+    ['paid_delivered','cancelled'].includes(o.status) && 
+    !o.archived &&
+    !isOlderThan30Days(o)
+  );
+  
+  // Apply status filter
+  if (currentCompletedFilter) {
+    filtered = filtered.filter(o => o.status === currentCompletedFilter);
+  }
+  
+  // Apply search
+  if (searchQuery.trim()) {
+    const q = searchQuery.toLowerCase();
     filtered = filtered.filter(o =>
       o.customerName.toLowerCase().includes(q) ||
       o.customerPhone.includes(q) ||
       o.orderNo.toLowerCase().includes(q)
     );
   }
+  
   filtered.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-  const container = document.getElementById('ordersList');
+  const container = document.getElementById('completedOrdersList');
   if (filtered.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><h3>No orders found</h3><p>Try different filters or create a new order</p></div>';
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><h3>No completed orders</h3><p>Completed orders from the last 30 days will appear here</p></div>';
   } else {
     container.innerHTML = filtered.map(o => renderOrderCard(o)).join('');
   }
 }
 
+// ARCHIVED TAB: Render archived orders
+function renderArchivedOrders() {
+  const allOrders = DB.get('orders') || [];
+  const searchQuery = (document.getElementById('archivedSearch')||{}).value || '';
+  
+  // Archived = manually archived OR auto-archived (completed > 30 days)
+  let filtered = allOrders.filter(o => 
+    o.archived || 
+    (['paid_delivered','cancelled'].includes(o.status) && isOlderThan30Days(o))
+  );
+  
+  // Apply search
+  if (searchQuery.trim()) {
+    const q = searchQuery.toLowerCase();
+    filtered = filtered.filter(o =>
+      o.customerName.toLowerCase().includes(q) ||
+      o.customerPhone.includes(q) ||
+      o.orderNo.toLowerCase().includes(q)
+    );
+  }
+  
+  filtered.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  const container = document.getElementById('archivedOrdersList');
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><h3>No archived orders</h3><p>Archived orders will appear here</p></div>';
+  } else {
+    container.innerHTML = filtered.map(o => renderOrderCard(o)).join('');
+  }
+}
+
+// Set filter for Active tab
 function setOrderFilter(filter, el) {
   currentOrderFilter = filter;
-  document.querySelectorAll('#orderFilterTabs .filter-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#activeTabContent .filter-tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   renderOrders();
 }
 
-function filterOrders() { renderOrders(); }
+// Set filter for Completed tab
+function setCompletedFilter(filter, el) {
+  currentCompletedFilter = filter;
+  document.querySelectorAll('#completedTabContent .filter-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderCompletedOrders();
+}
+
+// Search functions
+function filterCompletedOrders() { renderCompletedOrders(); }
+function filterArchivedOrders() { renderArchivedOrders(); }
+
+// Archive old orders (one-click)
+function archiveOldOrders() {
+  const orders = DB.get('orders') || [];
+  let archivedCount = 0;
+  
+  orders.forEach(order => {
+    if (['paid_delivered','cancelled'].includes(order.status) && isOlderThan30Days(order) && !order.archived) {
+      order.archived = true;
+      order.archivedAt = new Date().toISOString();
+      archivedCount++;
+    }
+  });
+  
+  if (archivedCount > 0) {
+    DB.set('orders', orders);
+    showToast(`✅ ${archivedCount} order${archivedCount > 1 ? 's' : ''} archived`, 'success');
+    renderCompletedOrders();
+  } else {
+    showToast('No old orders to archive', 'info');
+  }
+}
 
 // ============================================================
 // DUE DATE PAGE
