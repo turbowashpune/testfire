@@ -49,7 +49,7 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
 #app { height:100vh; overflow:hidden; display:flex; flex-direction:column; }
 
 /* ===== SCROLLABLE CONTENT ===== */
-.page-content { flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding-bottom:calc(var(--bottom-nav) + 20px); }
+.page-content { flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding-bottom:calc(var(--bottom-nav) + 80px); }
 .page-content::-webkit-scrollbar { display:none; }
 
 /* ===== LOGIN PAGE ===== */
@@ -421,7 +421,7 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
 .inv-table th { background:var(--card2); padding:6px 8px; font-size:10px; font-weight:700; text-align:left; }
 .inv-table td { padding:6px 8px; border-bottom:1px solid var(--border); font-size:11px; }
 .inv-total { background:var(--dark); color:white; padding:12px; border-radius:8px; margin-top:10px; }
-.inv-total-row { display:flex; justify-content:space-between; padding:3px 0; font-size:12px; }
+.inv-total-row { display:flex; justify-content:space-between; align-items:center; padding:3px 0; font-size:12px; }
 .inv-total-row.main { font-size:16px; font-weight:800; color:var(--yellow); margin-top:4px; }
 .inv-footer { text-align:center; margin-top:16px; padding-top:12px; border-top:2px dashed var(--border); }
 .inv-footer p { font-size:11px; color:var(--text2); }
@@ -608,10 +608,20 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
           <div class="stat-card" style="background:linear-gradient(135deg,#4CAF50,#66BB6A);color:white;padding:24px;border-radius:16px;box-shadow:0 4px 20px rgba(76,175,80,0.3);">
             <div style="display:flex;align-items:center;justify-content:space-between;">
               <div>
-                <div style="font-size:13px;opacity:0.9;margin-bottom:8px;">Total Revenue (Last 30 Days)</div>
+                <div style="font-size:13px;opacity:0.9;margin-bottom:8px;" id="currentMonthLabel">February 2026</div>
                 <div style="font-size:32px;font-weight:900;font-family:'Nunito',sans-serif;" id="monthlyRevenue">₹0</div>
               </div>
               <div style="font-size:48px;opacity:0.3;">💰</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Monthly Revenue Comparison -->
+        <div style="padding:0 16px;margin-top:20px;">
+          <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:12px;">📊 Monthly Comparison</div>
+          <div style="background:white;border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.08);overflow-x:auto;">
+            <div style="display:flex;gap:16px;min-width:max-content;" id="monthlyBarChart">
+              <!-- Will be populated by JavaScript -->
             </div>
           </div>
         </div>
@@ -1551,20 +1561,42 @@ function refreshDashboard() {
   document.getElementById('statOverdue').textContent = overdueOrders.length;
 
   if (currentUser.role === 'admin') {
+    // Last 30 days for dashboard stats
     const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const recentOrders = orders.filter(o => new Date(o.createdAt) >= thirtyDaysAgo && !o.archived);
-    const revenue = recentOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
+    const revenue30Days = recentOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
+    
+    // Current calendar month revenue
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const thisMonthOrders = orders.filter(o => {
+      const orderDate = new Date(o.createdAt);
+      return orderDate >= monthStart && orderDate <= monthEnd && !o.archived;
+    });
+    const monthRevenue = thisMonthOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
+    
     const unpaid = orders.filter(o => (o.totalAmount - (o.paidAmount||0)) > 0 && o.status !== 'cancelled');
-    document.getElementById('statRevenue').textContent = '₹' + revenue.toFixed(0);
+    document.getElementById('statRevenue').textContent = '₹' + revenue30Days.toFixed(0);
     document.getElementById('statUnpaid').textContent = unpaid.length;
     document.getElementById('statRevenueCard').style.display = '';
     document.getElementById('statUnpaidCard').style.display = '';
     
-    // Monthly Revenue (for home page)
+    // Update monthly revenue (calendar month)
     const monthlyRevenueEl = document.getElementById('monthlyRevenue');
     if (monthlyRevenueEl) {
-      monthlyRevenueEl.textContent = '₹' + revenue.toFixed(0);
+      monthlyRevenueEl.textContent = '₹' + monthRevenue.toFixed(0);
     }
+    
+    // Update month label
+    const monthLabelEl = document.getElementById('currentMonthLabel');
+    if (monthLabelEl) {
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      monthLabelEl.textContent = monthNames[now.getMonth()] + ' ' + now.getFullYear();
+    }
+    
+    // Render monthly bar chart (last 3 months)
+    renderMonthlyBarChart(orders);
   }
 
   // Overdue banner
@@ -1593,6 +1625,61 @@ function refreshDashboard() {
   } else {
     container.innerHTML = recent.map(o => renderOrderCard(o)).join('');
   }
+}
+
+// ============================================================
+// MONTHLY BAR CHART
+// ============================================================
+function renderMonthlyBarChart(orders) {
+  const chartContainer = document.getElementById('monthlyBarChart');
+  if (!chartContainer) return;
+  
+  const now = new Date();
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  // Calculate last 3 months (including current month)
+  const monthsData = [];
+  for (let i = 2; i >= 0; i--) {
+    const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+    const monthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59);
+    
+    const monthOrders = orders.filter(o => {
+      const orderDate = new Date(o.createdAt);
+      return orderDate >= monthStart && orderDate <= monthEnd && !o.archived;
+    });
+    
+    const revenue = monthOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
+    
+    monthsData.push({
+      month: monthNames[targetDate.getMonth()],
+      year: targetDate.getFullYear(),
+      revenue: revenue,
+      isCurrentMonth: i === 0
+    });
+  }
+  
+  // Find max revenue for scaling
+  const maxRevenue = Math.max(...monthsData.map(m => m.revenue), 1);
+  
+  // Render bars
+  chartContainer.innerHTML = monthsData.map(data => {
+    const heightPercent = (data.revenue / maxRevenue) * 100;
+    const barHeight = Math.max(heightPercent, 5); // Minimum 5% height for visibility
+    
+    return `
+      <div style="display:flex;flex-direction:column;align-items:center;min-width:90px;">
+        <div style="height:120px;display:flex;align-items:flex-end;width:100%;justify-content:center;margin-bottom:8px;">
+          <div style="width:50px;background:${data.isCurrentMonth ? 'linear-gradient(180deg,#4CAF50,#66BB6A)' : 'linear-gradient(180deg,#E0E0E0,#BDBDBD)'};border-radius:8px 8px 0 0;height:${barHeight}%;position:relative;display:flex;align-items:flex-start;justify-content:center;padding-top:6px;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+            ${data.revenue > 0 ? `<span style="font-size:10px;font-weight:700;color:${data.isCurrentMonth ? 'white' : '#666'};">₹${data.revenue >= 1000 ? (data.revenue/1000).toFixed(1) + 'k' : data.revenue.toFixed(0)}</span>` : ''}
+          </div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:12px;font-weight:700;color:${data.isCurrentMonth ? 'var(--orange)' : 'var(--text2)'};">${data.month}</div>
+          <div style="font-size:10px;color:var(--text3);">${data.year}</div>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 // ============================================================
@@ -2214,7 +2301,7 @@ function renderServiceItems(serviceId, serviceName, pricingType, existingItems) 
                 onchange="handleItemSelection('${serviceId}',${i},this.value,'${serviceName}','${pricingType}')"
                 style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:'Poppins',sans-serif;background:white;cursor:pointer;outline:none;">
                 <option value="">Select Item...</option>
-                ${savedItems.map(si=>`<option value="${si.name}" ${item.name===si.name?'selected':''}>${si.name} (₹${si.price})</option>`).join('')}
+                ${savedItems.map(si=>`<option value="${si.name}" ${item.name===si.name?'selected':''}>${si.name} (₹${si.price}${si.discount ? ' | Disc: ₹'+si.discount : ''})</option>`).join('')}
                 <option value="__ADD_CUSTOM__" style="color:var(--orange);font-weight:700;">+ Add Custom Item</option>
               </select>
             </div>
@@ -2306,7 +2393,7 @@ function handleItemSelection(serviceId, rowIndex, selectedValue, serviceName, pr
     // Show custom item dialog
     showAddCustomItemDialog(serviceId, rowIndex, serviceName, pricingType);
   } else if (selectedValue) {
-    // Auto-fill from saved item
+    // Auto-fill from saved item (including default discount)
     const services = DB.get('services') || [];
     const svc = services.find(s => s.id === serviceId);
     if (svc && svc.items) {
@@ -2314,6 +2401,7 @@ function handleItemSelection(serviceId, rowIndex, selectedValue, serviceName, pr
       if (match) {
         serviceItemsData[serviceId][rowIndex].name = match.name;
         serviceItemsData[serviceId][rowIndex].price = match.price;
+        serviceItemsData[serviceId][rowIndex].discount = match.discount || 0;
         renderServiceItems(serviceId, serviceName, pricingType, serviceItemsData[serviceId]);
         updatePaymentSummary();
       }
@@ -2322,6 +2410,7 @@ function handleItemSelection(serviceId, rowIndex, selectedValue, serviceName, pr
     // Clear selection
     serviceItemsData[serviceId][rowIndex].name = '';
     serviceItemsData[serviceId][rowIndex].price = '';
+    serviceItemsData[serviceId][rowIndex].discount = 0;
     renderServiceItems(serviceId, serviceName, pricingType, serviceItemsData[serviceId]);
     updatePaymentSummary();
   }
@@ -2340,10 +2429,16 @@ function showAddCustomItemDialog(serviceId, rowIndex, serviceName, pricingType) 
           style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;">
       </div>
       
-      <div style="margin-bottom:20px;">
+      <div style="margin-bottom:16px;">
         <label style="display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">Price (₹) *</label>
         <input type="number" id="customItemPrice" min="0" step="0.5" placeholder="0"
           style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;">
+      </div>
+      
+      <div style="margin-bottom:20px;">
+        <label style="display:block;font-size:12px;font-weight:700;color:#0277BD;margin-bottom:6px;">Default Discount (₹)</label>
+        <input type="number" id="customItemDiscount" min="0" step="1" placeholder="0" value="0"
+          style="width:100%;padding:10px;border:1.5px solid #29B6F6;border-radius:8px;font-size:14px;">
       </div>
       
       <div style="display:flex;gap:10px;">
@@ -2377,6 +2472,7 @@ function showAddCustomItemDialog(serviceId, rowIndex, serviceName, pricingType) 
 function saveCustomItem(serviceId, rowIndex, serviceName, pricingType) {
   const name = document.getElementById('customItemName').value.trim();
   const price = parseFloat(document.getElementById('customItemPrice').value);
+  const discount = parseFloat(document.getElementById('customItemDiscount').value) || 0;
   
   if (!name) {
     showToast('Please enter item name', 'warning');
@@ -2402,12 +2498,13 @@ function saveCustomItem(serviceId, rowIndex, serviceName, pricingType) {
       return;
     }
     
-    services[svcIndex].items.push({ name, price });
+    services[svcIndex].items.push({ name, price, discount });
     DB.set('services', services);
     
     // Add to current order
     serviceItemsData[serviceId][rowIndex].name = name;
     serviceItemsData[serviceId][rowIndex].price = price;
+    serviceItemsData[serviceId][rowIndex].discount = discount;
     
     closeModal('customItemModal');
     renderServiceItems(serviceId, serviceName, pricingType, serviceItemsData[serviceId]);
@@ -4322,7 +4419,8 @@ function showServiceItems(serviceId) {
     return (svc.items||[]).map((item,i) => `
       <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
         <div style="flex:1;font-weight:600;">${item.name}</div>
-        <div style="font-family:'Nunito',sans-serif;font-weight:800;color:var(--orange);">₹${item.price}</div>
+        <div style="font-family:'Nunito',sans-serif;font-weight:700;color:var(--text2);">₹${item.price}</div>
+        ${item.discount ? `<div style="font-family:'Nunito',sans-serif;font-weight:700;color:#0277BD;font-size:11px;">-₹${item.discount}</div>` : ''}
         <button class="btn btn-sm btn-secondary" onclick="editItem('${serviceId}',${i})">✏️</button>
         <button class="btn btn-sm btn-danger" onclick="deleteItem('${serviceId}',${i})">🗑</button>
       </div>`).join('');
@@ -4342,11 +4440,12 @@ function addNewItem(serviceId) {
   if (!name) return;
   const price = parseFloat(prompt('Price (₹):'));
   if (!price || isNaN(price)) return;
+  const discount = parseFloat(prompt('Default discount (₹):', '0')) || 0;
   const services = DB.get('services') || [];
   const svc = services.find(s => s.id === serviceId);
   if (!svc) return;
   if (!svc.items) svc.items = [];
-  svc.items.push({ name, price });
+  svc.items.push({ name, price, discount });
   DB.set('services', services);
   showToast('Item added! ✅', 'success');
   showServiceItems(serviceId);
@@ -4361,7 +4460,8 @@ function editItem(serviceId, index) {
   if (!name) return;
   const price = parseFloat(prompt('Price (₹):', item.price));
   if (isNaN(price)) return;
-  svc.items[index] = { name, price };
+  const discount = parseFloat(prompt('Default discount (₹):', item.discount || 0)) || 0;
+  svc.items[index] = { name, price, discount };
   DB.set('services', services);
   showToast('Item updated! ✅', 'success');
   showServiceItems(serviceId);
