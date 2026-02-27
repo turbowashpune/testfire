@@ -1596,7 +1596,11 @@ function refreshDashboard() {
     }
     
     // Render monthly bar chart (last 3 months)
-    renderMonthlyBarChart(orders);
+    try {
+      renderMonthlyBarChart(orders);
+    } catch (error) {
+      console.error('Error calling renderMonthlyBarChart:', error);
+    }
   }
 
   // Overdue banner
@@ -1631,55 +1635,60 @@ function refreshDashboard() {
 // MONTHLY BAR CHART
 // ============================================================
 function renderMonthlyBarChart(orders) {
-  const chartContainer = document.getElementById('monthlyBarChart');
-  if (!chartContainer) return;
-  
-  const now = new Date();
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
-  // Calculate last 3 months (including current month)
-  const monthsData = [];
-  for (let i = 2; i >= 0; i--) {
-    const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
-    const monthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59);
+  try {
+    const chartContainer = document.getElementById('monthlyBarChart');
+    if (!chartContainer) return;
+    if (!orders || !Array.isArray(orders)) return;
     
-    const monthOrders = orders.filter(o => {
-      const orderDate = new Date(o.createdAt);
-      return orderDate >= monthStart && orderDate <= monthEnd && !o.archived;
-    });
+    const now = new Date();
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
-    const revenue = monthOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
+    // Calculate last 3 months (including current month)
+    const monthsData = [];
+    for (let i = 2; i >= 0; i--) {
+      const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+      const monthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59);
+      
+      const monthOrders = orders.filter(o => {
+        const orderDate = new Date(o.createdAt);
+        return orderDate >= monthStart && orderDate <= monthEnd && !o.archived;
+      });
+      
+      const revenue = monthOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
+      
+      monthsData.push({
+        month: monthNames[targetDate.getMonth()],
+        year: targetDate.getFullYear(),
+        revenue: revenue,
+        isCurrentMonth: i === 0
+      });
+    }
     
-    monthsData.push({
-      month: monthNames[targetDate.getMonth()],
-      year: targetDate.getFullYear(),
-      revenue: revenue,
-      isCurrentMonth: i === 0
-    });
-  }
-  
-  // Find max revenue for scaling
-  const maxRevenue = Math.max(...monthsData.map(m => m.revenue), 1);
-  
-  // Render bars
-  chartContainer.innerHTML = monthsData.map(data => {
-    const heightPercent = (data.revenue / maxRevenue) * 100;
-    const barHeight = Math.max(heightPercent, 5); // Minimum 5% height for visibility
+    // Find max revenue for scaling
+    const maxRevenue = Math.max(...monthsData.map(m => m.revenue), 1);
     
-    return `
-      <div style="display:flex;flex-direction:column;align-items:center;min-width:90px;">
-        <div style="height:120px;display:flex;align-items:flex-end;width:100%;justify-content:center;margin-bottom:8px;">
-          <div style="width:50px;background:${data.isCurrentMonth ? 'linear-gradient(180deg,#4CAF50,#66BB6A)' : 'linear-gradient(180deg,#E0E0E0,#BDBDBD)'};border-radius:8px 8px 0 0;height:${barHeight}%;position:relative;display:flex;align-items:flex-start;justify-content:center;padding-top:6px;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-            ${data.revenue > 0 ? `<span style="font-size:10px;font-weight:700;color:${data.isCurrentMonth ? 'white' : '#666'};">₹${data.revenue >= 1000 ? (data.revenue/1000).toFixed(1) + 'k' : data.revenue.toFixed(0)}</span>` : ''}
+    // Render bars
+    chartContainer.innerHTML = monthsData.map(data => {
+      const heightPercent = (data.revenue / maxRevenue) * 100;
+      const barHeight = Math.max(heightPercent, 5); // Minimum 5% height for visibility
+      
+      return `
+        <div style="display:flex;flex-direction:column;align-items:center;min-width:90px;">
+          <div style="height:120px;display:flex;align-items:flex-end;width:100%;justify-content:center;margin-bottom:8px;">
+            <div style="width:50px;background:${data.isCurrentMonth ? 'linear-gradient(180deg,#4CAF50,#66BB6A)' : 'linear-gradient(180deg,#E0E0E0,#BDBDBD)'};border-radius:8px 8px 0 0;height:${barHeight}%;position:relative;display:flex;align-items:flex-start;justify-content:center;padding-top:6px;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+              ${data.revenue > 0 ? `<span style="font-size:10px;font-weight:700;color:${data.isCurrentMonth ? 'white' : '#666'};">₹${data.revenue >= 1000 ? (data.revenue/1000).toFixed(1) + 'k' : data.revenue.toFixed(0)}</span>` : ''}
+            </div>
           </div>
-        </div>
-        <div style="text-align:center;">
-          <div style="font-size:12px;font-weight:700;color:${data.isCurrentMonth ? 'var(--orange)' : 'var(--text2)'};">${data.month}</div>
-          <div style="font-size:10px;color:var(--text3);">${data.year}</div>
-        </div>
-      </div>`;
-  }).join('');
+          <div style="text-align:center;">
+            <div style="font-size:12px;font-weight:700;color:${data.isCurrentMonth ? 'var(--orange)' : 'var(--text2)'};">${data.month}</div>
+            <div style="font-size:10px;color:var(--text3);">${data.year}</div>
+          </div>
+        </div>`;
+    }).join('');
+  } catch (error) {
+    console.error('Error rendering monthly bar chart:', error);
+  }
 }
 
 // ============================================================
