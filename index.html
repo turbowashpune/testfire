@@ -2070,10 +2070,10 @@ function renderOrderForm(order, prefillCustomer) {
       <div class="payment-summary" id="paymentSummary">
         <div class="pay-row"><span>Subtotal</span><strong id="ps_subtotal">₹0.00</strong></div>
         <div class="pay-row">
-          <span>Discount</span>
-          <input type="number" id="f_discount" value="${order?order.discount||0:0}" min="0" step="1"
-            style="width:80px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:6px 10px;color:white;text-align:right;font-size:14px;font-weight:700;"
-            oninput="updatePaymentSummary()" placeholder="0">
+          <span>Discount <span style="font-size:10px;opacity:0.7;">(Auto)</span></span>
+          <input type="number" id="f_discount" value="${order?order.discount||0:0}" min="0" step="1" readonly
+            style="width:80px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:6px 10px;color:white;text-align:right;font-size:14px;font-weight:700;cursor:not-allowed;opacity:0.8;"
+            placeholder="0">
         </div>
         <hr class="pay-divider">
         <div class="pay-row"><span>Total Amount</span><strong id="ps_total">₹0.00</strong></div>
@@ -2240,37 +2240,50 @@ function renderServiceItems(serviceId, serviceName, pricingType, existingItems) 
             <button onclick="removeItemRow('${serviceId}',${i})" style="background:rgba(244,67,54,0.1);border:1.5px solid rgba(244,67,54,0.3);border-radius:8px;padding:8px 10px;cursor:pointer;color:var(--danger);font-size:16px;">🗑</button>
           </div>
           
-          <!-- Row 2: Details, Price, Discount, Total -->
+          <!-- Row 2: Column Headers -->
+          <div style="display:flex;gap:8px;padding:6px 0 4px;">
+            <div style="flex:1;">
+              <span style="font-size:10px;color:var(--text2);font-weight:700;text-transform:uppercase;">Details</span>
+            </div>
+            <div style="width:50px;text-align:center;">
+              <span style="font-size:10px;color:var(--text2);font-weight:700;text-transform:uppercase;">Price</span>
+            </div>
+            <div style="width:45px;text-align:center;">
+              <span style="font-size:10px;color:#0277BD;font-weight:700;text-transform:uppercase;">Disc</span>
+            </div>
+            <div style="width:65px;text-align:center;">
+              <span style="font-size:10px;color:var(--orange);font-weight:700;text-transform:uppercase;">Total</span>
+            </div>
+          </div>
+          
+          <!-- Row 3: Input Fields -->
           <div style="display:flex;gap:8px;align-items:center;">
             <div style="flex:1;">
               <input type="text" value="${item.details||''}" maxlength="200"
                 onchange="updateItemField('${serviceId}',${i},'details',this.value)"
                 oninput="updateItemField('${serviceId}',${i},'details',this.value)"
-                placeholder="Details: color, brand, notes..."
+                placeholder="color, brand, notes..."
                 style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:'Poppins',sans-serif;outline:none;">
             </div>
             
-            <div style="display:flex;gap:6px;align-items:center;">
-              <span style="font-size:11px;color:var(--text2);font-weight:600;">Price</span>
+            <div style="width:50px;">
               <input type="number" min="0" step="0.5" value="${item.price||''}"
                 onchange="updateItemField('${serviceId}',${i},'price',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                 oninput="updateItemField('${serviceId}',${i},'price',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                 placeholder="0"
-                style="width:60px;border:1.5px solid var(--border);border-radius:6px;padding:6px 4px;font-size:13px;text-align:center;font-weight:700;">
+                style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:7px 4px;font-size:13px;text-align:center;font-weight:700;">
             </div>
             
-            <div style="display:flex;gap:6px;align-items:center;">
-              <span style="font-size:11px;color:#0277BD;font-weight:600;">Disc</span>
+            <div style="width:45px;">
               <input type="number" min="0" step="1" value="${item.discount||0}"
                 onchange="updateItemField('${serviceId}',${i},'discount',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                 oninput="updateItemField('${serviceId}',${i},'discount',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                 placeholder="0"
-                style="width:50px;border:1.5px solid #29B6F6;border-radius:6px;padding:6px 4px;font-size:13px;text-align:center;font-weight:700;color:#0277BD;">
+                style="width:100%;border:1.5px solid #29B6F6;border-radius:6px;padding:7px 4px;font-size:13px;text-align:center;font-weight:700;color:#0277BD;">
             </div>
             
-            <div style="min-width:70px;text-align:right;padding:6px 8px;background:rgba(255,107,0,0.1);border-radius:8px;border:1.5px solid rgba(255,107,0,0.2);">
-              <div style="font-size:9px;color:var(--text3);font-weight:600;">Total</div>
-              <div style="font-weight:800;font-size:15px;color:var(--orange);" id="itemTotal_${serviceId}_${i}">₹${calcSub(item).toFixed(0)}</div>
+            <div style="width:65px;text-align:center;padding:8px;background:rgba(255,107,0,0.1);border-radius:8px;border:1.5px solid rgba(255,107,0,0.2);">
+              <div style="font-weight:800;font-size:16px;color:var(--orange);" id="itemTotal_${serviceId}_${i}">₹${calcSub(item).toFixed(0)}</div>
             </div>
           </div>
         </div>
@@ -2586,16 +2599,32 @@ function calcOrderTotal() {
 }
 
 function updatePaymentSummary() {
-  let subtotal = 0;
+  let subtotalBeforeDiscount = 0;
+  let totalItemDiscounts = 0;
+  
+  // Calculate subtotal (before discounts) and sum all per-item discounts
   Object.values(serviceItemsData).forEach(items => {
-    items.forEach(item => { subtotal += calcItemSub(item); });
+    items.forEach(item => {
+      const qty = parseFloat(item.qty) || 1;
+      const price = parseFloat(item.price) || 0;
+      const itemDiscount = parseFloat(item.discount) || 0;
+      
+      subtotalBeforeDiscount += (qty * price);
+      totalItemDiscounts += itemDiscount;
+    });
   });
-  const discount = parseFloat(document.getElementById('f_discount')?.value) || 0;
-  const total = Math.max(0, subtotal - discount);
+  
+  // Auto-populate discount field with sum of per-item discounts
+  const discountField = document.getElementById('f_discount');
+  if (discountField) {
+    discountField.value = totalItemDiscounts.toFixed(0);
+  }
+  
+  const total = Math.max(0, subtotalBeforeDiscount - totalItemDiscounts);
   const advance = parseFloat(document.getElementById('f_advancePaid')?.value) || 0;
   const balance = Math.max(0, total - advance);
   
-  if(document.getElementById('ps_subtotal')) document.getElementById('ps_subtotal').textContent = '₹' + subtotal.toFixed(2);
+  if(document.getElementById('ps_subtotal')) document.getElementById('ps_subtotal').textContent = '₹' + subtotalBeforeDiscount.toFixed(2);
   if(document.getElementById('ps_total')) document.getElementById('ps_total').textContent = '₹' + total.toFixed(2);
   if(document.getElementById('ps_balance')) document.getElementById('ps_balance').textContent = '₹' + balance.toFixed(2);
 }
@@ -2667,7 +2696,12 @@ function saveOrder() {
   const services = DB.get('services') || [];
   const orderServices = Object.entries(serviceItemsData).map(([serviceId, items]) => {
     const svc = services.find(s => s.id === serviceId);
-    const serviceTotal = items.reduce((sum, i) => sum + calcItemSub(i), 0);
+    // Calculate service total BEFORE discounts
+    const serviceTotal = items.reduce((sum, i) => {
+      const qty = parseFloat(i.qty) || 1;
+      const price = parseFloat(i.price) || 0;
+      return sum + (qty * price);
+    }, 0);
     return {
       serviceId, serviceName: svc?svc.name:'', pricingType: svc?svc.pricingType:'per_item',
       items: items.filter(i => i.name||i.price),
@@ -2675,9 +2709,13 @@ function saveOrder() {
     };
   });
 
-  const totalAmount = orderServices.reduce((sum, s) => sum + s.serviceTotal, 0);
-  const discount = parseFloat(document.getElementById('f_discount').value) || 0;
-  const finalTotal = Math.max(0, totalAmount - discount);
+  // Calculate subtotal (before discounts) and total discounts
+  const subtotal = orderServices.reduce((sum, s) => sum + s.serviceTotal, 0);
+  const totalItemDiscounts = Object.values(serviceItemsData).reduce((sum, items) => {
+    return sum + items.reduce((itemSum, item) => itemSum + (parseFloat(item.discount) || 0), 0);
+  }, 0);
+  
+  const finalTotal = Math.max(0, subtotal - totalItemDiscounts);
   const paidAmount = parseFloat(document.getElementById('f_advancePaid').value) || 0;
   const paymentMode = document.getElementById('f_paymentMode').value;
   const notes = document.getElementById('f_notes').value.trim();
@@ -2698,7 +2736,7 @@ function saveOrder() {
       orders[idx] = {
         ...orders[idx],
         customerName: name, customerPhone: phone, customerPhone2: phone2, customerAddress: address,
-        orderDate, dueDate, services: orderServices, subtotal: totalAmount, discount, totalAmount: finalTotal, paidAmount, paymentMode, notes,
+        orderDate, dueDate, services: orderServices, subtotal: subtotal, discount: totalItemDiscounts, totalAmount: finalTotal, paidAmount, paymentMode, notes,
         updatedAt: new Date().toISOString(), updatedBy: currentUser.name
       };
     }
@@ -2714,7 +2752,7 @@ function saveOrder() {
     const newOrder = {
       id: 'ord_' + Date.now(), orderNo, orderDate, dueDate,
       customerName: name, customerPhone: phone, customerPhone2: phone2, customerAddress: address,
-      services: orderServices, subtotal: totalAmount, discount, totalAmount: finalTotal, paidAmount, paymentMode, notes,
+      services: orderServices, subtotal: subtotal, discount: totalItemDiscounts, totalAmount: finalTotal, paidAmount, paymentMode, notes,
       status: 'received',
       trackingCode: generateTrackingCode('ord_' + Date.now()),
       trackingExpiry: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
