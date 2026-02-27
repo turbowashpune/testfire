@@ -4937,6 +4937,10 @@ function confirmAction() {
 let toastTimeout;
 function showToast(msg, type) {
   const toast = document.getElementById('toast');
+  if (!toast) {
+    console.log('Toast:', msg, type);
+    return;
+  }
   toast.textContent = msg;
   toast.className = 'toast show' + (type?' '+type:'');
   clearTimeout(toastTimeout);
