@@ -470,6 +470,17 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
 /* Role specific hiding */
 .admin-only { display:none; }
 .operator-plus { display:none; }
+
+/* Remove arrows from number inputs */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -616,7 +627,7 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
           </div>
         </div>
         
-        <!-- Monthly Revenue Comparison -->
+        <!-- Monthly Revenue Comparison - TEMPORARILY DISABLED
         <div style="padding:0 16px;margin-top:20px;">
           <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:12px;">📊 Monthly Comparison</div>
           <div style="background:white;border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.08);overflow-x:auto;">
@@ -625,6 +636,7 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
             </div>
           </div>
         </div>
+        -->
       </div>
     </div>
 
@@ -1004,16 +1016,35 @@ async function manualSync() {
       }
     }
     
-    // STEP 2: Pull all data from cloud
+    // STEP 2: Pull all data from cloud (but preserve local data if cloud is empty)
     const snapshot = await firestore.collection('appData').get();
     let pulled = 0;
+    let skipped = 0;
     
     snapshot.forEach(doc => {
       const cloudData = doc.data().data;
-      if (cloudData) {
-        localStorage.setItem('twl_' + doc.id, JSON.stringify(cloudData));
-        pulled++;
+      const key = doc.id;
+      const localData = DB.get(key);
+      
+      // Don't overwrite local data with empty cloud data
+      if (!cloudData || (Array.isArray(cloudData) && cloudData.length === 0)) {
+        console.log('⚠️ Skipping pull - cloud data is empty for:', key);
+        skipped++;
+        return;
       }
+      
+      // If local data exists and has more items, keep local
+      if (Array.isArray(localData) && Array.isArray(cloudData)) {
+        if (localData.length > cloudData.length) {
+          console.log('⚠️ Local data has more items, keeping local for:', key, `(${localData.length} vs ${cloudData.length})`);
+          skipped++;
+          return;
+        }
+      }
+      
+      // Safe to pull from cloud
+      localStorage.setItem('twl_' + key, JSON.stringify(cloudData));
+      pulled++;
     });
     
     // STEP 3: Refresh UI
@@ -1024,7 +1055,10 @@ async function manualSync() {
     
     icon.textContent = '✅';
     text.textContent = 'Synced!';
-    showToast(`Sync complete! ↑${pushed} ↓${pulled}`, 'success');
+    const msg = skipped > 0 
+      ? `Sync complete! ↑${pushed} ↓${pulled} (${skipped} kept local)` 
+      : `Sync complete! ↑${pushed} ↓${pulled}`;
+    showToast(msg, 'success');
     
     setTimeout(() => {
       icon.textContent = '🔄';
@@ -1097,11 +1131,26 @@ if (typeof firebase !== 'undefined') {
             const cloudData = change.doc.data().data;
             const localData = DB.get(key);
             
+            // CRITICAL: Don't overwrite local data with empty cloud data
+            // Only sync if cloud data has actual content
+            if (!cloudData || (Array.isArray(cloudData) && cloudData.length === 0) || (typeof cloudData === 'object' && Object.keys(cloudData).length === 0)) {
+              console.log('⚠️ Skipping sync - cloud data is empty for:', key);
+              return; // Skip this update
+            }
+            
             // Update if different or doesn't exist locally
             const cloudStr = JSON.stringify(cloudData);
             const localStr = JSON.stringify(localData);
             
             if (cloudStr !== localStr) {
+              // If local data exists and has more items, keep local data
+              if (Array.isArray(localData) && Array.isArray(cloudData)) {
+                if (localData.length > cloudData.length) {
+                  console.log('⚠️ Local data has more items, keeping local for:', key);
+                  return; // Keep local data
+                }
+              }
+              
               localStorage.setItem('twl_' + key, cloudStr);
               console.log('🔄 Synced from cloud:', key);
               
@@ -1595,12 +1644,12 @@ function refreshDashboard() {
       monthLabelEl.textContent = monthNames[now.getMonth()] + ' ' + now.getFullYear();
     }
     
-    // Render monthly bar chart (last 3 months)
-    try {
-      renderMonthlyBarChart(orders);
-    } catch (error) {
-      console.error('Error calling renderMonthlyBarChart:', error);
-    }
+    // Render monthly bar chart (TEMPORARILY DISABLED)
+    // try {
+    //   renderMonthlyBarChart(orders);
+    // } catch (error) {
+    //   console.error('Error calling renderMonthlyBarChart:', error);
+    // }
   }
 
   // Overdue banner
@@ -1618,12 +1667,16 @@ function refreshDashboard() {
   // Greeting
   const h = new Date().getHours();
   const greet = h < 12 ? 'Good Morning! ☀️' : h < 17 ? 'Good Afternoon! 🌤️' : 'Good Evening! 🌙';
-  document.getElementById('dashGreeting').textContent = greet;
-  document.getElementById('dashDate').textContent = formatDate(new Date()) + ' | ' + (DB.get('shopSettings')||{}).name;
+  const greetingEl = document.getElementById('dashGreeting');
+  const dateEl = document.getElementById('dashDate');
+  if (greetingEl) greetingEl.textContent = greet;
+  if (dateEl) dateEl.textContent = formatDate(new Date()) + ' | ' + (DB.get('shopSettings')||{}).name;
 
   // Recent orders
   const recent = [...orders].sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt)).slice(0,10);
   const container = document.getElementById('recentOrdersList');
+  if (!container) return; // Exit if element doesn't exist
+  
   if (recent.length === 0) {
     container.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><h3>No orders yet</h3><p>Create your first order!</p></div>';
   } else {
@@ -1882,6 +1935,8 @@ function renderOrders() {
   filtered.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const container = document.getElementById('ordersList');
+  if (!container) return; // Exit if element doesn't exist
+  
   if (filtered.length === 0) {
     container.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><h3>No active orders</h3><p>All orders are completed or archived</p></div>';
   } else {
@@ -1919,6 +1974,8 @@ function renderCompletedOrders() {
   filtered.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const container = document.getElementById('completedOrdersList');
+  if (!container) return; // Exit if element doesn't exist
+  
   if (filtered.length === 0) {
     container.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><h3>No completed orders</h3><p>Completed orders from the last 30 days will appear here</p></div>';
   } else {
@@ -1950,6 +2007,8 @@ function renderArchivedOrders() {
   filtered.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const container = document.getElementById('archivedOrdersList');
+  if (!container) return; // Exit if element doesn't exist
+  
   if (filtered.length === 0) {
     container.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><h3>No archived orders</h3><p>Archived orders will appear here</p></div>';
   } else {
@@ -2038,7 +2097,8 @@ function renderDueDatePage() {
   }
 
   const lastUpdated = `<div style="text-align:center;padding:8px;font-size:11px;color:var(--text3);">Last updated: ${formatDateTime(new Date())}</div>`;
-  document.getElementById('dueDateContent').innerHTML = html + lastUpdated;
+  const contentEl = document.getElementById('dueDateContent');
+  if (contentEl) contentEl.innerHTML = html + lastUpdated;
 }
 
 function checkOverduePopup() {
@@ -2290,6 +2350,17 @@ function renderServiceItems(serviceId, serviceName, pricingType, existingItems) 
   const savedItems = svc ? (svc.items || []) : [];
 
   serviceItemsData[serviceId] = existingItems && existingItems.length > 0 ? existingItems : [{ name:'', qty:1, price:'', subtotal:0, details:'', discount:0 }];
+
+  // Auto-populate price and discount for items that have names but missing price/discount
+  serviceItemsData[serviceId].forEach(item => {
+    if (item.name && (!item.price || item.price === '')) {
+      const match = savedItems.find(si => si.name === item.name);
+      if (match) {
+        item.price = match.price;
+        item.discount = match.discount || 0;
+      }
+    }
+  });
 
   const calcSub = (item) => Math.max(0, ((parseFloat(item.qty)||1)*(parseFloat(item.price)||0)) - (parseFloat(item.discount)||0));
 
@@ -3948,6 +4019,8 @@ function renderCustomers() {
   filtered.sort((a,b) => new Date(b.lastVisit||0) - new Date(a.lastVisit||0));
 
   const container = document.getElementById('customersList');
+  if (!container) return; // Exit if element doesn't exist
+  
   if (filtered.length === 0) {
     container.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div><h3>No customers yet</h3><p>Customers are added automatically when you create orders</p></div>';
     return;
