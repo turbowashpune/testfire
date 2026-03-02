@@ -991,74 +991,106 @@ async function manualSync() {
   const icon = document.getElementById('syncIcon');
   const text = document.getElementById('syncText');
   
+  if (!btn || !icon || !text) {
+    console.error('❌ Sync UI elements not found');
+    return;
+  }
+  
   if (typeof firebase === 'undefined') {
     showToast('Firebase not initialized', 'error');
     return;
   }
+  
+  // FAILSAFE: Auto-reset button after 30 seconds no matter what
+  const failsafeTimeout = setTimeout(() => {
+    console.error('❌ SYNC TIMEOUT - Resetting button');
+    icon.textContent = '❌';
+    text.textContent = 'Timeout';
+    showToast('Sync timeout - please try again', 'error');
+    setTimeout(() => {
+      icon.textContent = '🔄';
+      text.textContent = 'Sync';
+      btn.disabled = false;
+    }, 2000);
+  }, 30000); // 30 second timeout
   
   btn.disabled = true;
   icon.textContent = '⏳';
   text.textContent = 'Syncing...';
   
   try {
-    // STEP 1: Push all local data to cloud
+    console.log('🔄 Starting manual sync...');
+    console.log('Firebase available:', typeof firebase !== 'undefined');
+    console.log('Firestore available:', typeof firestore !== 'undefined');
+    
+    // STEP 1: Push all local data to cloud FIRST
+    console.log('📤 Step 1: Pushing local data to cloud...');
     const keys = ['orders', 'customers', 'services', 'users', 'shopSettings', 'orderCounter', 'whatsappTemplates', 'shareCounts'];
     let pushed = 0;
     
     for (const key of keys) {
-      const data = DB.get(key);
-      if (data) {
-        await firestore.collection('appData').doc(key).set({
-          data: data,
-          updated: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        pushed++;
+      try {
+        const data = DB.get(key);
+        if (data) {
+          console.log(`  Pushing ${key}:`, Array.isArray(data) ? `${data.length} items` : 'object');
+          await firestore.collection('appData').doc(key).set({
+            data: data,
+            updated: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          pushed++;
+          console.log(`  ✅ Pushed ${key}`);
+        } else {
+          console.log(`  ⚠️ Skipping ${key} - no data`);
+        }
+      } catch (err) {
+        console.error(`  ❌ Failed to push ${key}:`, err.message);
       }
     }
+    console.log(`✅ Pushed ${pushed} collections to cloud`);
     
-    // STEP 2: Pull all data from cloud (but preserve local data if cloud is empty)
+    // STEP 2: Pull all data from cloud
+    console.log('📥 Step 2: Pulling data from cloud...');
     const snapshot = await firestore.collection('appData').get();
+    console.log(`  Found ${snapshot.size} documents in cloud`);
     let pulled = 0;
-    let skipped = 0;
     
     snapshot.forEach(doc => {
-      const cloudData = doc.data().data;
-      const key = doc.id;
-      const localData = DB.get(key);
-      
-      // Don't overwrite local data with empty cloud data
-      if (!cloudData || (Array.isArray(cloudData) && cloudData.length === 0)) {
-        console.log('⚠️ Skipping pull - cloud data is empty for:', key);
-        skipped++;
-        return;
-      }
-      
-      // If local data exists and has more items, keep local
-      if (Array.isArray(localData) && Array.isArray(cloudData)) {
-        if (localData.length > cloudData.length) {
-          console.log('⚠️ Local data has more items, keeping local for:', key, `(${localData.length} vs ${cloudData.length})`);
-          skipped++;
-          return;
+      try {
+        const cloudData = doc.data().data;
+        const key = doc.id;
+        
+        if (cloudData !== null && cloudData !== undefined) {
+          localStorage.setItem('twl_' + key, JSON.stringify(cloudData));
+          pulled++;
+          console.log(`  ✅ Pulled ${key}:`, Array.isArray(cloudData) ? `${cloudData.length} items` : 'object');
+        } else {
+          console.log(`  ⚠️ Skipping ${key} - null data`);
         }
+      } catch (err) {
+        console.error(`  ❌ Failed to pull ${doc.id}:`, err.message);
       }
-      
-      // Safe to pull from cloud
-      localStorage.setItem('twl_' + key, JSON.stringify(cloudData));
-      pulled++;
     });
+    console.log(`✅ Pulled ${pulled} collections from cloud`);
     
     // STEP 3: Refresh UI
-    if (typeof renderOrders === 'function') renderOrders();
-    if (typeof renderDueDatePage === 'function') renderDueDatePage();
-    if (typeof refreshDashboard === 'function') refreshDashboard();
-    if (typeof renderCustomers === 'function') renderCustomers();
+    console.log('🔄 Step 3: Refreshing UI...');
+    try {
+      if (typeof renderOrders === 'function') renderOrders();
+      if (typeof renderDueDatePage === 'function') renderDueDatePage();
+      if (typeof refreshDashboard === 'function') refreshDashboard();
+      if (typeof renderCustomers === 'function') renderCustomers();
+      console.log('✅ UI refreshed');
+    } catch (err) {
+      console.error('❌ Failed to refresh UI:', err.message);
+    }
+    
+    // Clear the failsafe timeout
+    clearTimeout(failsafeTimeout);
     
     icon.textContent = '✅';
     text.textContent = 'Synced!';
-    const msg = skipped > 0 
-      ? `Sync complete! ↑${pushed} ↓${pulled} (${skipped} kept local)` 
-      : `Sync complete! ↑${pushed} ↓${pulled}`;
-    showToast(msg, 'success');
+    showToast(`Sync complete! ↑${pushed} ↓${pulled}`, 'success');
+    console.log('✅ Manual sync completed successfully');
     
     setTimeout(() => {
       icon.textContent = '🔄';
@@ -1067,7 +1099,12 @@ async function manualSync() {
     }, 2000);
     
   } catch(err) {
-    console.error('Manual sync error:', err);
+    console.error('❌ Manual sync error:', err);
+    console.error('Error stack:', err.stack);
+    
+    // Clear the failsafe timeout
+    clearTimeout(failsafeTimeout);
+    
     icon.textContent = '❌';
     text.textContent = 'Failed';
     showToast('Sync failed: ' + err.message, 'error');
@@ -1079,6 +1116,54 @@ async function manualSync() {
     }, 2000);
   }
 }
+
+// DEBUG HELPER - Call this from console: debugSync()
+window.debugSync = function() {
+  console.log('=== TURBOWASH SYNC DEBUG ===');
+  console.log('');
+  console.log('1. FIREBASE STATUS:');
+  console.log('  Firebase loaded:', typeof firebase !== 'undefined');
+  console.log('  Firestore loaded:', typeof firestore !== 'undefined');
+  
+  console.log('');
+  console.log('2. LOCAL DATA:');
+  const orders = DB.get('orders') || [];
+  const customers = DB.get('customers') || [];
+  const services = DB.get('services') || [];
+  console.log('  Orders:', orders.length, 'items');
+  console.log('  Customers:', customers.length, 'items');
+  console.log('  Services:', services.length, 'items');
+  
+  if (orders.length > 0) {
+    console.log('');
+    console.log('3. SAMPLE ORDER:');
+    console.log(orders[0]);
+  }
+  
+  console.log('');
+  console.log('4. TRYING TEST SYNC...');
+  if (typeof firestore !== 'undefined') {
+    firestore.collection('appData').doc('orders').get()
+      .then(doc => {
+        if (doc.exists) {
+          const cloudOrders = doc.data().data || [];
+          console.log('  Cloud orders:', cloudOrders.length, 'items');
+          console.log('  ✅ Firebase connection working!');
+        } else {
+          console.log('  ⚠️ No orders document in cloud yet');
+        }
+      })
+      .catch(err => {
+        console.error('  ❌ Firebase error:', err.message);
+      });
+  } else {
+    console.log('  ❌ Firestore not available');
+  }
+  
+  console.log('');
+  console.log('=== END DEBUG ===');
+  console.log('If you see errors above, copy ALL console output and share it');
+};
 
 // Auto-sync on data changes
 const originalDBSet = DB.set;
@@ -1129,28 +1214,18 @@ if (typeof firebase !== 'undefined') {
           if (change.type === 'modified' || change.type === 'added') {
             const key = change.doc.id;
             const cloudData = change.doc.data().data;
-            const localData = DB.get(key);
             
-            // CRITICAL: Don't overwrite local data with empty cloud data
-            // Only sync if cloud data has actual content
-            if (!cloudData || (Array.isArray(cloudData) && cloudData.length === 0) || (typeof cloudData === 'object' && Object.keys(cloudData).length === 0)) {
-              console.log('⚠️ Skipping sync - cloud data is empty for:', key);
-              return; // Skip this update
+            // Skip if cloud data is null/undefined
+            if (cloudData === null || cloudData === undefined) {
+              return;
             }
             
-            // Update if different or doesn't exist locally
+            // Check if different from local
+            const localData = DB.get(key);
             const cloudStr = JSON.stringify(cloudData);
             const localStr = JSON.stringify(localData);
             
             if (cloudStr !== localStr) {
-              // If local data exists and has more items, keep local data
-              if (Array.isArray(localData) && Array.isArray(cloudData)) {
-                if (localData.length > cloudData.length) {
-                  console.log('⚠️ Local data has more items, keeping local for:', key);
-                  return; // Keep local data
-                }
-              }
-              
               localStorage.setItem('twl_' + key, cloudStr);
               console.log('🔄 Synced from cloud:', key);
               
@@ -1175,6 +1250,12 @@ if (typeof firebase !== 'undefined') {
     });
   }, 3000); // Wait 3 seconds after login
 }
+
+// Helper function to merge array data intelligently
+// DEPRECATED - Using simple cloud-as-source-of-truth sync instead
+// function mergeArrayData(localArray, cloudArray, key) {
+//   ... merge logic removed for simplicity
+// }
 
 
 // ============================================================
