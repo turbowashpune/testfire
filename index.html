@@ -1165,42 +1165,52 @@ window.debugSync = function() {
   console.log('If you see errors above, copy ALL console output and share it');
 };
 
-// Auto-sync on data changes
+// Auto-sync on data changes - DISABLED (causing conflicts)
+// Use manual sync button instead
+/*
 const originalDBSet = DB.set;
 DB.set = function(key, val) {
   const result = originalDBSet(key, val);
   syncToCloud(key, val);
   return result;
 };
+*/
 
-// Pull from cloud on startup
+// Pull from cloud on startup - SIMPLIFIED
 async function pullFromCloud() {
-  if (typeof firebase === 'undefined') return;
+  if (typeof firebase === 'undefined' || typeof firestore === 'undefined') {
+    console.log('Firebase not ready, skipping pull from cloud');
+    return;
+  }
   try {
+    console.log('📥 Pulling data from cloud on startup...');
     const snapshot = await firestore.collection('appData').get();
-    let updated = false;
+    let pulled = 0;
+    
     snapshot.forEach(doc => {
-      const local = DB.get(doc.id);
-      const cloud = doc.data().data;
-      // Use cloud data if local doesn't exist
-      if (!local && cloud) {
-        localStorage.setItem('twl_' + doc.id, JSON.stringify(cloud));
-        updated = true;
+      const cloudData = doc.data().data;
+      if (cloudData !== null && cloudData !== undefined) {
+        localStorage.setItem('twl_' + doc.id, JSON.stringify(cloudData));
+        pulled++;
       }
     });
-    if (updated) {
-      console.log('✅ Synced from cloud');
-      // Refresh UI instead of reload
+    
+    if (pulled > 0) {
+      console.log(`✅ Pulled ${pulled} collections from cloud on startup`);
+      // Refresh UI
       if (typeof renderOrders === 'function') renderOrders();
       if (typeof renderDueDatePage === 'function') renderDueDatePage();
       if (typeof refreshDashboard === 'function') refreshDashboard();
+      if (typeof renderCustomers === 'function') renderCustomers();
     }
   } catch(e) { 
-    console.error('Pull error:', e);
+    console.error('❌ Pull from cloud error:', e.message);
   }
 }
 
-// Listen for changes from other devices
+// Listen for changes from other devices - DISABLED (causing conflicts)
+// Re-enable this later once manual sync is working
+/*
 let syncTimeout;
 if (typeof firebase !== 'undefined') {
   // Wait for app to load before starting listener
@@ -1250,6 +1260,8 @@ if (typeof firebase !== 'undefined') {
     });
   }, 3000); // Wait 3 seconds after login
 }
+*/
+// Background sync listener disabled - using manual sync only for now
 
 // Helper function to merge array data intelligently
 // DEPRECATED - Using simple cloud-as-source-of-truth sync instead
