@@ -8,13 +8,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>TurboWash Laundry</title>
-
-<!-- Open Graph / WhatsApp Preview -->
-<meta property="og:type" content="website">
-<meta property="og:title" content="TurboWash Laundry">
-<meta property="og:description" content="Track your laundry order">
-<meta property="og:site_name" content="TurboWash Laundry">
-
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -49,7 +42,7 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
 #app { height:100vh; overflow:hidden; display:flex; flex-direction:column; }
 
 /* ===== SCROLLABLE CONTENT ===== */
-.page-content { flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding-bottom:calc(var(--bottom-nav) + 80px); }
+.page-content { flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding-bottom:calc(var(--bottom-nav) + 20px); }
 .page-content::-webkit-scrollbar { display:none; }
 
 /* ===== LOGIN PAGE ===== */
@@ -421,7 +414,7 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
 .inv-table th { background:var(--card2); padding:6px 8px; font-size:10px; font-weight:700; text-align:left; }
 .inv-table td { padding:6px 8px; border-bottom:1px solid var(--border); font-size:11px; }
 .inv-total { background:var(--dark); color:white; padding:12px; border-radius:8px; margin-top:10px; }
-.inv-total-row { display:flex; justify-content:space-between; align-items:center; padding:3px 0; font-size:12px; }
+.inv-total-row { display:flex; justify-content:space-between; padding:3px 0; font-size:12px; }
 .inv-total-row.main { font-size:16px; font-weight:800; color:var(--yellow); margin-top:4px; }
 .inv-footer { text-align:center; margin-top:16px; padding-top:12px; border-top:2px dashed var(--border); }
 .inv-footer p { font-size:11px; color:var(--text2); }
@@ -470,17 +463,6 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
 /* Role specific hiding */
 .admin-only { display:none; }
 .operator-plus { display:none; }
-
-/* Remove arrows from number inputs */
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-input[type="number"] {
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -611,103 +593,37 @@ input[type="number"] {
             <div class="stat-lbl">Unpaid Orders</div>
           </div>
         </div>
-        <!-- Monthly Revenue -->
+        <!-- Recent Orders -->
         <div class="section-header">
-          <h3>This Month's Revenue</h3>
+          <h3>Recent Orders</h3>
+          <a onclick="switchPage('pageOrders')">View All ›</a>
         </div>
-        <div style="padding:0 16px;">
-          <div class="stat-card" style="background:linear-gradient(135deg,#4CAF50,#66BB6A);color:white;padding:24px;border-radius:16px;box-shadow:0 4px 20px rgba(76,175,80,0.3);">
-            <div style="display:flex;align-items:center;justify-content:space-between;">
-              <div>
-                <div style="font-size:13px;opacity:0.9;margin-bottom:8px;" id="currentMonthLabel">February 2026</div>
-                <div style="font-size:32px;font-weight:900;font-family:'Nunito',sans-serif;" id="monthlyRevenue">₹0</div>
-              </div>
-              <div style="font-size:48px;opacity:0.3;">💰</div>
-            </div>
-          </div>
+        <div class="recent-orders" id="recentOrdersList">
+          <div class="loading"><div class="spinner"></div></div>
         </div>
-        
-        <!-- Monthly Revenue Comparison - TEMPORARILY DISABLED
-        <div style="padding:0 16px;margin-top:20px;">
-          <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:12px;">📊 Monthly Comparison</div>
-          <div style="background:white;border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.08);overflow-x:auto;">
-            <div style="display:flex;gap:16px;min-width:max-content;" id="monthlyBarChart">
-              <!-- Will be populated by JavaScript -->
-            </div>
-          </div>
-        </div>
-        -->
       </div>
     </div>
 
     <!-- ORDERS PAGE -->
     <div class="page" id="pageOrders">
       <div class="page-content">
-        
-        <!-- Main Tabs: Active | Completed | Archived -->
-        <div style="padding:12px 16px 0;">
-          <div style="display:flex;gap:8px;border-bottom:2px solid #eee;">
-            <div class="main-tab active" id="tabActive" onclick="switchOrderTab('active')" style="flex:1;text-align:center;padding:12px;font-weight:700;cursor:pointer;border-bottom:3px solid var(--orange);color:var(--orange);">
-              Active Orders
-            </div>
-            <div class="main-tab" id="tabCompleted" onclick="switchOrderTab('completed')" style="flex:1;text-align:center;padding:12px;font-weight:700;cursor:pointer;border-bottom:3px solid transparent;color:#999;">
-              Completed
-            </div>
-            <div class="main-tab" id="tabArchived" onclick="switchOrderTab('archived')" style="flex:1;text-align:center;padding:12px;font-weight:700;cursor:pointer;border-bottom:3px solid transparent;color:#999;">
-              Archived
-            </div>
+        <div class="search-bar">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" placeholder="Search by name, phone or order no..." id="orderSearch" oninput="filterOrders()">
           </div>
         </div>
-
-        <!-- Active Tab Content -->
-        <div id="activeTabContent">
-          <div class="filter-tabs" style="padding:8px 16px;">
-            <div class="filter-tab active" onclick="setOrderFilter('all',this)">All</div>
-            <div class="filter-tab" onclick="setOrderFilter('received',this)">Received</div>
-            <div class="filter-tab" onclick="setOrderFilter('inprogress',this)">In-Progress</div>
-            <div class="filter-tab" onclick="setOrderFilter('ready',this)">Ready</div>
-            <div class="filter-tab" onclick="setOrderFilter('unpaid_delivered',this)">Un-Paid & Delivered</div>
-          </div>
-          <div id="ordersList" style="padding:0 16px; display:flex; flex-direction:column; gap:8px; padding-bottom:20px;">
-            <div class="loading"><div class="spinner"></div></div>
-          </div>
+        <div class="filter-tabs" id="orderFilterTabs">
+          <div class="filter-tab active" onclick="setOrderFilter('all',this)">All</div>
+          <div class="filter-tab" onclick="setOrderFilter('received',this)">Received</div>
+          <div class="filter-tab" onclick="setOrderFilter('inprogress',this)">In Progress</div>
+          <div class="filter-tab" onclick="setOrderFilter('ready',this)">Ready</div>
+          <div class="filter-tab" onclick="setOrderFilter('delivered',this)">Delivered</div>
+          <div class="filter-tab" onclick="setOrderFilter('cancelled',this)">Cancelled</div>
         </div>
-
-        <!-- Completed Tab Content -->
-        <div id="completedTabContent" style="display:none;">
-          <div style="padding:12px 16px;">
-            <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
-              <div class="search-input-wrap" style="flex:1;">
-                <span class="search-icon">🔍</span>
-                <input type="text" placeholder="Search completed orders..." id="completedSearch" oninput="filterCompletedOrders()">
-              </div>
-              <button class="btn btn-primary btn-sm" onclick="archiveOldOrders()" style="white-space:nowrap;">
-                📦 Archive
-              </button>
-            </div>
-            <div class="filter-tabs">
-              <div class="filter-tab active" onclick="setCompletedFilter('paid_delivered',this)">Paid & Delivered</div>
-              <div class="filter-tab" onclick="setCompletedFilter('cancelled',this)">Cancelled</div>
-            </div>
-          </div>
-          <div id="completedOrdersList" style="padding:0 16px; display:flex; flex-direction:column; gap:8px; padding-bottom:20px;">
-            <div class="loading"><div class="spinner"></div></div>
-          </div>
+        <div id="ordersList" style="padding:0 16px; display:flex; flex-direction:column; gap:8px; padding-bottom:20px;">
+          <div class="loading"><div class="spinner"></div></div>
         </div>
-
-        <!-- Archived Tab Content -->
-        <div id="archivedTabContent" style="display:none;">
-          <div style="padding:12px 16px;">
-            <div class="search-input-wrap">
-              <span class="search-icon">🔍</span>
-              <input type="text" placeholder="Search archived orders..." id="archivedSearch" oninput="filterArchivedOrders()">
-            </div>
-          </div>
-          <div id="archivedOrdersList" style="padding:0 16px; display:flex; flex-direction:column; gap:8px; padding-bottom:20px;">
-            <div class="loading"><div class="spinner"></div></div>
-          </div>
-        </div>
-
       </div>
     </div>
 
@@ -991,106 +907,52 @@ async function manualSync() {
   const icon = document.getElementById('syncIcon');
   const text = document.getElementById('syncText');
   
-  if (!btn || !icon || !text) {
-    console.error('❌ Sync UI elements not found');
-    return;
-  }
-  
   if (typeof firebase === 'undefined') {
     showToast('Firebase not initialized', 'error');
     return;
   }
-  
-  // FAILSAFE: Auto-reset button after 30 seconds no matter what
-  const failsafeTimeout = setTimeout(() => {
-    console.error('❌ SYNC TIMEOUT - Resetting button');
-    icon.textContent = '❌';
-    text.textContent = 'Timeout';
-    showToast('Sync timeout - please try again', 'error');
-    setTimeout(() => {
-      icon.textContent = '🔄';
-      text.textContent = 'Sync';
-      btn.disabled = false;
-    }, 2000);
-  }, 30000); // 30 second timeout
   
   btn.disabled = true;
   icon.textContent = '⏳';
   text.textContent = 'Syncing...';
   
   try {
-    console.log('🔄 Starting manual sync...');
-    console.log('Firebase available:', typeof firebase !== 'undefined');
-    console.log('Firestore available:', typeof firestore !== 'undefined');
-    
-    // STEP 1: Push all local data to cloud FIRST
-    console.log('📤 Step 1: Pushing local data to cloud...');
+    // STEP 1: Push all local data to cloud
     const keys = ['orders', 'customers', 'services', 'users', 'shopSettings', 'orderCounter', 'whatsappTemplates', 'shareCounts'];
     let pushed = 0;
     
     for (const key of keys) {
-      try {
-        const data = DB.get(key);
-        if (data) {
-          console.log(`  Pushing ${key}:`, Array.isArray(data) ? `${data.length} items` : 'object');
-          await firestore.collection('appData').doc(key).set({
-            data: data,
-            updated: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          pushed++;
-          console.log(`  ✅ Pushed ${key}`);
-        } else {
-          console.log(`  ⚠️ Skipping ${key} - no data`);
-        }
-      } catch (err) {
-        console.error(`  ❌ Failed to push ${key}:`, err.message);
+      const data = DB.get(key);
+      if (data) {
+        await firestore.collection('appData').doc(key).set({
+          data: data,
+          updated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        pushed++;
       }
     }
-    console.log(`✅ Pushed ${pushed} collections to cloud`);
     
     // STEP 2: Pull all data from cloud
-    console.log('📥 Step 2: Pulling data from cloud...');
     const snapshot = await firestore.collection('appData').get();
-    console.log(`  Found ${snapshot.size} documents in cloud`);
     let pulled = 0;
     
     snapshot.forEach(doc => {
-      try {
-        const cloudData = doc.data().data;
-        const key = doc.id;
-        
-        if (cloudData !== null && cloudData !== undefined) {
-          localStorage.setItem('twl_' + key, JSON.stringify(cloudData));
-          pulled++;
-          console.log(`  ✅ Pulled ${key}:`, Array.isArray(cloudData) ? `${cloudData.length} items` : 'object');
-        } else {
-          console.log(`  ⚠️ Skipping ${key} - null data`);
-        }
-      } catch (err) {
-        console.error(`  ❌ Failed to pull ${doc.id}:`, err.message);
+      const cloudData = doc.data().data;
+      if (cloudData) {
+        localStorage.setItem('twl_' + doc.id, JSON.stringify(cloudData));
+        pulled++;
       }
     });
-    console.log(`✅ Pulled ${pulled} collections from cloud`);
     
     // STEP 3: Refresh UI
-    console.log('🔄 Step 3: Refreshing UI...');
-    try {
-      if (typeof renderOrders === 'function') renderOrders();
-      if (typeof renderDueDatePage === 'function') renderDueDatePage();
-      if (typeof refreshDashboard === 'function') refreshDashboard();
-      if (typeof renderCustomers === 'function') renderCustomers();
-      console.log('✅ UI refreshed');
-    } catch (err) {
-      console.error('❌ Failed to refresh UI:', err.message);
-    }
-    
-    // Clear the failsafe timeout
-    clearTimeout(failsafeTimeout);
+    if (typeof renderOrders === 'function') renderOrders();
+    if (typeof renderDueDatePage === 'function') renderDueDatePage();
+    if (typeof refreshDashboard === 'function') refreshDashboard();
+    if (typeof renderCustomers === 'function') renderCustomers();
     
     icon.textContent = '✅';
     text.textContent = 'Synced!';
     showToast(`Sync complete! ↑${pushed} ↓${pulled}`, 'success');
-    console.log('✅ Manual sync completed successfully');
     
     setTimeout(() => {
       icon.textContent = '🔄';
@@ -1099,12 +961,7 @@ async function manualSync() {
     }, 2000);
     
   } catch(err) {
-    console.error('❌ Manual sync error:', err);
-    console.error('Error stack:', err.stack);
-    
-    // Clear the failsafe timeout
-    clearTimeout(failsafeTimeout);
-    
+    console.error('Manual sync error:', err);
     icon.textContent = '❌';
     text.textContent = 'Failed';
     showToast('Sync failed: ' + err.message, 'error');
@@ -1117,100 +974,42 @@ async function manualSync() {
   }
 }
 
-// DEBUG HELPER - Call this from console: debugSync()
-window.debugSync = function() {
-  console.log('=== TURBOWASH SYNC DEBUG ===');
-  console.log('');
-  console.log('1. FIREBASE STATUS:');
-  console.log('  Firebase loaded:', typeof firebase !== 'undefined');
-  console.log('  Firestore loaded:', typeof firestore !== 'undefined');
-  
-  console.log('');
-  console.log('2. LOCAL DATA:');
-  const orders = DB.get('orders') || [];
-  const customers = DB.get('customers') || [];
-  const services = DB.get('services') || [];
-  console.log('  Orders:', orders.length, 'items');
-  console.log('  Customers:', customers.length, 'items');
-  console.log('  Services:', services.length, 'items');
-  
-  if (orders.length > 0) {
-    console.log('');
-    console.log('3. SAMPLE ORDER:');
-    console.log(orders[0]);
-  }
-  
-  console.log('');
-  console.log('4. TRYING TEST SYNC...');
-  if (typeof firestore !== 'undefined') {
-    firestore.collection('appData').doc('orders').get()
-      .then(doc => {
-        if (doc.exists) {
-          const cloudOrders = doc.data().data || [];
-          console.log('  Cloud orders:', cloudOrders.length, 'items');
-          console.log('  ✅ Firebase connection working!');
-        } else {
-          console.log('  ⚠️ No orders document in cloud yet');
-        }
-      })
-      .catch(err => {
-        console.error('  ❌ Firebase error:', err.message);
-      });
-  } else {
-    console.log('  ❌ Firestore not available');
-  }
-  
-  console.log('');
-  console.log('=== END DEBUG ===');
-  console.log('If you see errors above, copy ALL console output and share it');
-};
-
-// Auto-sync on data changes - DISABLED (causing conflicts)
-// Use manual sync button instead
-/*
+// Auto-sync on data changes
 const originalDBSet = DB.set;
 DB.set = function(key, val) {
   const result = originalDBSet(key, val);
   syncToCloud(key, val);
   return result;
 };
-*/
 
-// Pull from cloud on startup - SIMPLIFIED
+// Pull from cloud on startup
 async function pullFromCloud() {
-  if (typeof firebase === 'undefined' || typeof firestore === 'undefined') {
-    console.log('Firebase not ready, skipping pull from cloud');
-    return;
-  }
+  if (typeof firebase === 'undefined') return;
   try {
-    console.log('📥 Pulling data from cloud on startup...');
     const snapshot = await firestore.collection('appData').get();
-    let pulled = 0;
-    
+    let updated = false;
     snapshot.forEach(doc => {
-      const cloudData = doc.data().data;
-      if (cloudData !== null && cloudData !== undefined) {
-        localStorage.setItem('twl_' + doc.id, JSON.stringify(cloudData));
-        pulled++;
+      const local = DB.get(doc.id);
+      const cloud = doc.data().data;
+      // Use cloud data if local doesn't exist
+      if (!local && cloud) {
+        localStorage.setItem('twl_' + doc.id, JSON.stringify(cloud));
+        updated = true;
       }
     });
-    
-    if (pulled > 0) {
-      console.log(`✅ Pulled ${pulled} collections from cloud on startup`);
-      // Refresh UI
+    if (updated) {
+      console.log('✅ Synced from cloud');
+      // Refresh UI instead of reload
       if (typeof renderOrders === 'function') renderOrders();
       if (typeof renderDueDatePage === 'function') renderDueDatePage();
       if (typeof refreshDashboard === 'function') refreshDashboard();
-      if (typeof renderCustomers === 'function') renderCustomers();
     }
   } catch(e) { 
-    console.error('❌ Pull from cloud error:', e.message);
+    console.error('Pull error:', e);
   }
 }
 
-// Listen for changes from other devices - DISABLED (causing conflicts)
-// Re-enable this later once manual sync is working
-/*
+// Listen for changes from other devices
 let syncTimeout;
 if (typeof firebase !== 'undefined') {
   // Wait for app to load before starting listener
@@ -1224,14 +1023,9 @@ if (typeof firebase !== 'undefined') {
           if (change.type === 'modified' || change.type === 'added') {
             const key = change.doc.id;
             const cloudData = change.doc.data().data;
-            
-            // Skip if cloud data is null/undefined
-            if (cloudData === null || cloudData === undefined) {
-              return;
-            }
-            
-            // Check if different from local
             const localData = DB.get(key);
+            
+            // Update if different or doesn't exist locally
             const cloudStr = JSON.stringify(cloudData);
             const localStr = JSON.stringify(localData);
             
@@ -1260,14 +1054,6 @@ if (typeof firebase !== 'undefined') {
     });
   }, 3000); // Wait 3 seconds after login
 }
-*/
-// Background sync listener disabled - using manual sync only for now
-
-// Helper function to merge array data intelligently
-// DEPRECATED - Using simple cloud-as-source-of-truth sync instead
-// function mergeArrayData(localArray, cloudArray, key) {
-//   ... merge logic removed for simplicity
-// }
 
 
 // ============================================================
@@ -1433,8 +1219,6 @@ function getLogo() {
 // ============================================================
 let currentUser = null;
 let currentOrderFilter = 'all';
-let currentOrderTab = 'active'; // active, completed, archived
-let currentCompletedFilter = 'paid_delivered';
 let editingOrderId = null;
 let currentInvoiceOrderId = null;
 let dueDateRefreshInterval = null;
@@ -1507,7 +1291,7 @@ function checkTrackingURL() {
   }
 }
 
-function showTrackingPage_OLD_INTERNAL_UNUSED(orderNo) {
+function showTrackingPage(orderNo) {
   document.getElementById('mainApp').style.display = 'none';
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('trackingPage').style.display = 'block';
@@ -1675,11 +1459,7 @@ function switchPage(pageId) {
   if (navBtn) navBtn.classList.add('active');
 
   if (pageId === 'pageDashboard') refreshDashboard();
-  if (pageId === 'pageOrders') {
-    // Initialize with Active tab
-    currentOrderTab = 'active';
-    switchOrderTab('active');
-  }
+  if (pageId === 'pageOrders') renderOrders();
   if (pageId === 'pageDueDate') renderDueDatePage();
   if (pageId === 'pageCustomers') renderCustomers();
 }
@@ -1703,46 +1483,14 @@ function refreshDashboard() {
   document.getElementById('statOverdue').textContent = overdueOrders.length;
 
   if (currentUser.role === 'admin') {
-    // Last 30 days for dashboard stats
     const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentOrders = orders.filter(o => new Date(o.createdAt) >= thirtyDaysAgo && !o.archived);
-    const revenue30Days = recentOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
-    
-    // Current calendar month revenue
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-    const thisMonthOrders = orders.filter(o => {
-      const orderDate = new Date(o.createdAt);
-      return orderDate >= monthStart && orderDate <= monthEnd && !o.archived;
-    });
-    const monthRevenue = thisMonthOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
-    
+    const recentOrders = orders.filter(o => new Date(o.createdAt) >= thirtyDaysAgo);
+    const revenue = recentOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
     const unpaid = orders.filter(o => (o.totalAmount - (o.paidAmount||0)) > 0 && o.status !== 'cancelled');
-    document.getElementById('statRevenue').textContent = '₹' + revenue30Days.toFixed(0);
+    document.getElementById('statRevenue').textContent = '₹' + revenue.toFixed(0);
     document.getElementById('statUnpaid').textContent = unpaid.length;
     document.getElementById('statRevenueCard').style.display = '';
     document.getElementById('statUnpaidCard').style.display = '';
-    
-    // Update monthly revenue (calendar month)
-    const monthlyRevenueEl = document.getElementById('monthlyRevenue');
-    if (monthlyRevenueEl) {
-      monthlyRevenueEl.textContent = '₹' + monthRevenue.toFixed(0);
-    }
-    
-    // Update month label
-    const monthLabelEl = document.getElementById('currentMonthLabel');
-    if (monthLabelEl) {
-      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-      monthLabelEl.textContent = monthNames[now.getMonth()] + ' ' + now.getFullYear();
-    }
-    
-    // Render monthly bar chart (TEMPORARILY DISABLED)
-    // try {
-    //   renderMonthlyBarChart(orders);
-    // } catch (error) {
-    //   console.error('Error calling renderMonthlyBarChart:', error);
-    // }
   }
 
   // Overdue banner
@@ -1760,80 +1508,16 @@ function refreshDashboard() {
   // Greeting
   const h = new Date().getHours();
   const greet = h < 12 ? 'Good Morning! ☀️' : h < 17 ? 'Good Afternoon! 🌤️' : 'Good Evening! 🌙';
-  const greetingEl = document.getElementById('dashGreeting');
-  const dateEl = document.getElementById('dashDate');
-  if (greetingEl) greetingEl.textContent = greet;
-  if (dateEl) dateEl.textContent = formatDate(new Date()) + ' | ' + (DB.get('shopSettings')||{}).name;
+  document.getElementById('dashGreeting').textContent = greet;
+  document.getElementById('dashDate').textContent = formatDate(new Date()) + ' | ' + (DB.get('shopSettings')||{}).name;
 
   // Recent orders
   const recent = [...orders].sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt)).slice(0,10);
   const container = document.getElementById('recentOrdersList');
-  if (!container) return; // Exit if element doesn't exist
-  
   if (recent.length === 0) {
     container.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><h3>No orders yet</h3><p>Create your first order!</p></div>';
   } else {
     container.innerHTML = recent.map(o => renderOrderCard(o)).join('');
-  }
-}
-
-// ============================================================
-// MONTHLY BAR CHART
-// ============================================================
-function renderMonthlyBarChart(orders) {
-  try {
-    const chartContainer = document.getElementById('monthlyBarChart');
-    if (!chartContainer) return;
-    if (!orders || !Array.isArray(orders)) return;
-    
-    const now = new Date();
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    // Calculate last 3 months (including current month)
-    const monthsData = [];
-    for (let i = 2; i >= 0; i--) {
-      const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
-      const monthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59);
-      
-      const monthOrders = orders.filter(o => {
-        const orderDate = new Date(o.createdAt);
-        return orderDate >= monthStart && orderDate <= monthEnd && !o.archived;
-      });
-      
-      const revenue = monthOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
-      
-      monthsData.push({
-        month: monthNames[targetDate.getMonth()],
-        year: targetDate.getFullYear(),
-        revenue: revenue,
-        isCurrentMonth: i === 0
-      });
-    }
-    
-    // Find max revenue for scaling
-    const maxRevenue = Math.max(...monthsData.map(m => m.revenue), 1);
-    
-    // Render bars
-    chartContainer.innerHTML = monthsData.map(data => {
-      const heightPercent = (data.revenue / maxRevenue) * 100;
-      const barHeight = Math.max(heightPercent, 5); // Minimum 5% height for visibility
-      
-      return `
-        <div style="display:flex;flex-direction:column;align-items:center;min-width:90px;">
-          <div style="height:120px;display:flex;align-items:flex-end;width:100%;justify-content:center;margin-bottom:8px;">
-            <div style="width:50px;background:${data.isCurrentMonth ? 'linear-gradient(180deg,#4CAF50,#66BB6A)' : 'linear-gradient(180deg,#E0E0E0,#BDBDBD)'};border-radius:8px 8px 0 0;height:${barHeight}%;position:relative;display:flex;align-items:flex-start;justify-content:center;padding-top:6px;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-              ${data.revenue > 0 ? `<span style="font-size:10px;font-weight:700;color:${data.isCurrentMonth ? 'white' : '#666'};">₹${data.revenue >= 1000 ? (data.revenue/1000).toFixed(1) + 'k' : data.revenue.toFixed(0)}</span>` : ''}
-            </div>
-          </div>
-          <div style="text-align:center;">
-            <div style="font-size:12px;font-weight:700;color:${data.isCurrentMonth ? 'var(--orange)' : 'var(--text2)'};">${data.month}</div>
-            <div style="font-size:10px;color:var(--text3);">${data.year}</div>
-          </div>
-        </div>`;
-    }).join('');
-  } catch (error) {
-    console.error('Error rendering monthly bar chart:', error);
   }
 }
 
@@ -1957,199 +1641,46 @@ function renderOrderCard(order) {
         <div style="font-size:10px;opacity:0.9;">Send notification to customer</div>
       </div>
     </div>` : ''}
-    ${order._oldUnpaid ? `<div style="margin-top:8px;padding:8px 10px;background:rgba(244,67,54,0.1);border:1.5px solid rgba(244,67,54,0.3);border-radius:8px;display:flex;align-items:center;gap:8px;">
-      <span style="font-size:16px;">⚠️</span>
-      <div style="flex:1;">
-        <div style="font-size:11px;font-weight:700;color:var(--danger);">Payment Overdue!</div>
-        <div style="font-size:10px;color:var(--text2);">Delivered ${Math.floor((new Date() - new Date(order.createdAt))/(1000*60*60*24))} days ago</div>
-      </div>
-    </div>` : ''}
   </div>`;
 }
 
 // ============================================================
 // ORDERS PAGE
 // ============================================================
-
-// Helper: Check if order is older than 30 days
-function isOlderThan30Days(order) {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  return new Date(order.createdAt) < thirtyDaysAgo;
-}
-
-// Switch between main tabs
-function switchOrderTab(tab) {
-  currentOrderTab = tab;
-  
-  // Update tab styles
-  document.querySelectorAll('.main-tab').forEach(t => {
-    t.style.borderBottom = '3px solid transparent';
-    t.style.color = '#999';
-    t.classList.remove('active');
-  });
-  
-  const activeTab = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
-  activeTab.style.borderBottom = '3px solid var(--orange)';
-  activeTab.style.color = 'var(--orange)';
-  activeTab.classList.add('active');
-  
-  // Show/hide content
-  document.getElementById('activeTabContent').style.display = tab === 'active' ? 'block' : 'none';
-  document.getElementById('completedTabContent').style.display = tab === 'completed' ? 'block' : 'none';
-  document.getElementById('archivedTabContent').style.display = tab === 'archived' ? 'block' : 'none';
-  
-  // Render appropriate list
-  if (tab === 'active') renderOrders();
-  else if (tab === 'completed') renderCompletedOrders();
-  else if (tab === 'archived') renderArchivedOrders();
-}
-
-// ACTIVE TAB: Render active orders
 function renderOrders() {
-  const allOrders = DB.get('orders') || [];
-  
-  // Active = received, inprogress, ready, unpaid_delivered
-  let filtered = allOrders.filter(o => ['received','inprogress','ready','unpaid_delivered'].includes(o.status));
-  
-  // Apply status filter
+  const orders = DB.get('orders') || [];
+  const search = (document.getElementById('orderSearch')||{}).value || '';
+  let filtered = orders;
+
   if (currentOrderFilter !== 'all') {
     filtered = filtered.filter(o => o.status === currentOrderFilter);
   }
-  
-  // Check for old Un-Paid & Delivered orders and add warning
-  filtered = filtered.map(o => {
-    if (o.status === 'unpaid_delivered' && isOlderThan30Days(o)) {
-      o._oldUnpaid = true; // Flag for warning
-    }
-    return o;
-  });
-  
+  if (search.trim()) {
+    const q = search.toLowerCase();
+    filtered = filtered.filter(o =>
+      o.customerName.toLowerCase().includes(q) ||
+      o.customerPhone.includes(q) ||
+      o.orderNo.toLowerCase().includes(q)
+    );
+  }
   filtered.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const container = document.getElementById('ordersList');
-  if (!container) return; // Exit if element doesn't exist
-  
   if (filtered.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><h3>No active orders</h3><p>All orders are completed or archived</p></div>';
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><h3>No orders found</h3><p>Try different filters or create a new order</p></div>';
   } else {
     container.innerHTML = filtered.map(o => renderOrderCard(o)).join('');
   }
 }
 
-// COMPLETED TAB: Render completed orders (last 30 days only)
-function renderCompletedOrders() {
-  const allOrders = DB.get('orders') || [];
-  const searchQuery = (document.getElementById('completedSearch')||{}).value || '';
-  
-  // Completed = paid_delivered, cancelled (last 30 days, not archived)
-  let filtered = allOrders.filter(o => 
-    ['paid_delivered','cancelled'].includes(o.status) && 
-    !o.archived &&
-    !isOlderThan30Days(o)
-  );
-  
-  // Apply status filter
-  if (currentCompletedFilter) {
-    filtered = filtered.filter(o => o.status === currentCompletedFilter);
-  }
-  
-  // Apply search
-  if (searchQuery.trim()) {
-    const q = searchQuery.toLowerCase();
-    filtered = filtered.filter(o =>
-      o.customerName.toLowerCase().includes(q) ||
-      o.customerPhone.includes(q) ||
-      o.orderNo.toLowerCase().includes(q)
-    );
-  }
-  
-  filtered.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-  const container = document.getElementById('completedOrdersList');
-  if (!container) return; // Exit if element doesn't exist
-  
-  if (filtered.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><h3>No completed orders</h3><p>Completed orders from the last 30 days will appear here</p></div>';
-  } else {
-    container.innerHTML = filtered.map(o => renderOrderCard(o)).join('');
-  }
-}
-
-// ARCHIVED TAB: Render archived orders
-function renderArchivedOrders() {
-  const allOrders = DB.get('orders') || [];
-  const searchQuery = (document.getElementById('archivedSearch')||{}).value || '';
-  
-  // Archived = manually archived OR auto-archived (completed > 30 days)
-  let filtered = allOrders.filter(o => 
-    o.archived || 
-    (['paid_delivered','cancelled'].includes(o.status) && isOlderThan30Days(o))
-  );
-  
-  // Apply search
-  if (searchQuery.trim()) {
-    const q = searchQuery.toLowerCase();
-    filtered = filtered.filter(o =>
-      o.customerName.toLowerCase().includes(q) ||
-      o.customerPhone.includes(q) ||
-      o.orderNo.toLowerCase().includes(q)
-    );
-  }
-  
-  filtered.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-  const container = document.getElementById('archivedOrdersList');
-  if (!container) return; // Exit if element doesn't exist
-  
-  if (filtered.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><h3>No archived orders</h3><p>Archived orders will appear here</p></div>';
-  } else {
-    container.innerHTML = filtered.map(o => renderOrderCard(o)).join('');
-  }
-}
-
-// Set filter for Active tab
 function setOrderFilter(filter, el) {
   currentOrderFilter = filter;
-  document.querySelectorAll('#activeTabContent .filter-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#orderFilterTabs .filter-tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   renderOrders();
 }
 
-// Set filter for Completed tab
-function setCompletedFilter(filter, el) {
-  currentCompletedFilter = filter;
-  document.querySelectorAll('#completedTabContent .filter-tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
-  renderCompletedOrders();
-}
-
-// Search functions
-function filterCompletedOrders() { renderCompletedOrders(); }
-function filterArchivedOrders() { renderArchivedOrders(); }
-
-// Archive old orders (one-click)
-function archiveOldOrders() {
-  const orders = DB.get('orders') || [];
-  let archivedCount = 0;
-  
-  orders.forEach(order => {
-    if (['paid_delivered','cancelled'].includes(order.status) && isOlderThan30Days(order) && !order.archived) {
-      order.archived = true;
-      order.archivedAt = new Date().toISOString();
-      archivedCount++;
-    }
-  });
-  
-  if (archivedCount > 0) {
-    DB.set('orders', orders);
-    showToast(`✅ ${archivedCount} order${archivedCount > 1 ? 's' : ''} archived`, 'success');
-    renderCompletedOrders();
-  } else {
-    showToast('No old orders to archive', 'info');
-  }
-}
+function filterOrders() { renderOrders(); }
 
 // ============================================================
 // DUE DATE PAGE
@@ -2190,8 +1721,7 @@ function renderDueDatePage() {
   }
 
   const lastUpdated = `<div style="text-align:center;padding:8px;font-size:11px;color:var(--text3);">Last updated: ${formatDateTime(new Date())}</div>`;
-  const contentEl = document.getElementById('dueDateContent');
-  if (contentEl) contentEl.innerHTML = html + lastUpdated;
+  document.getElementById('dueDateContent').innerHTML = html + lastUpdated;
 }
 
 function checkOverduePopup() {
@@ -2317,14 +1847,6 @@ function renderOrderForm(order, prefillCustomer) {
     <div class="form-section">
       <div class="form-section-title">💰 Payment</div>
       <div class="payment-summary" id="paymentSummary">
-        <div class="pay-row"><span>Subtotal</span><strong id="ps_subtotal">₹0.00</strong></div>
-        <div class="pay-row">
-          <span>Discount <span style="font-size:10px;opacity:0.7;">(Auto)</span></span>
-          <input type="number" id="f_discount" value="${order?order.discount||0:0}" min="0" step="1" readonly
-            style="width:80px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:6px 10px;color:white;text-align:right;font-size:14px;font-weight:700;cursor:not-allowed;opacity:0.8;"
-            placeholder="0">
-        </div>
-        <hr class="pay-divider">
         <div class="pay-row"><span>Total Amount</span><strong id="ps_total">₹0.00</strong></div>
         <hr class="pay-divider">
         <div class="pay-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
@@ -2442,249 +1964,86 @@ function renderServiceItems(serviceId, serviceName, pricingType, existingItems) 
   const svc = services.find(s => s.id === serviceId);
   const savedItems = svc ? (svc.items || []) : [];
 
-  serviceItemsData[serviceId] = existingItems && existingItems.length > 0 ? existingItems : [{ name:'', qty:1, price:'', subtotal:0, details:'', discount:0 }];
-
-  // Auto-populate price and discount for items that have names but missing price/discount
-  serviceItemsData[serviceId].forEach(item => {
-    if (item.name && (!item.price || item.price === '')) {
-      const match = savedItems.find(si => si.name === item.name);
-      if (match) {
-        item.price = match.price;
-        item.discount = match.discount || 0;
-      }
-    }
-  });
+  serviceItemsData[serviceId] = existingItems && existingItems.length > 0 ? existingItems : [{ name:'', qty:1, price:'', subtotal:0 }];
 
   const calcSub = (item) => Math.max(0, ((parseFloat(item.qty)||1)*(parseFloat(item.price)||0)) - (parseFloat(item.discount)||0));
 
   const renderTable = () => {
     const items = serviceItemsData[serviceId];
-    return `<div id="svc_${serviceId}" style="margin-bottom:16px;background:var(--card2);border-radius:12px;padding:12px;border:1px solid var(--border);">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <span style="font-weight:700;font-size:14px;color:var(--orange);">${serviceName}</span>
-        <span style="font-size:11px;color:var(--text2);background:rgba(255,107,0,0.1);padding:4px 8px;border-radius:6px;">${pricingType==='per_kg'?'Per KG':'Per Item'}</span>
+    return `<div id="svc_${serviceId}" style="margin-bottom:16px;background:var(--card2);border-radius:12px;padding:10px;border:1px solid var(--border);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-weight:700;font-size:13px;color:var(--orange);">${serviceName}</span>
+        <span style="font-size:11px;color:var(--text2);">${pricingType==='per_kg'?'Per KG':'Per Item'}</span>
       </div>
-      
-      ${items.map((item,i) => `
-        <div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px;">
-          <!-- Row 1: Item Dropdown, Quantity, Remove -->
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-            <div style="flex:1;position:relative;">
-              <select id="itemSelect_${serviceId}_${i}" 
-                onchange="handleItemSelection('${serviceId}',${i},this.value,'${serviceName}','${pricingType}')"
-                style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:'Poppins',sans-serif;background:white;cursor:pointer;outline:none;">
-                <option value="">Select Item...</option>
-                ${savedItems.map(si=>`<option value="${si.name}" ${item.name===si.name?'selected':''}>${si.name} (₹${si.price}${si.discount ? ' | Disc: ₹'+si.discount : ''})</option>`).join('')}
-                <option value="__ADD_CUSTOM__" style="color:var(--orange);font-weight:700;">+ Add Custom Item</option>
-              </select>
-            </div>
-            
-            <div style="display:flex;align-items:center;gap:4px;">
+      <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:340px;">
+        <thead>
+          <tr style="background:rgba(255,107,0,0.08);">
+            <th style="padding:6px 4px;text-align:left;font-size:10px;color:var(--text2);font-weight:700;min-width:90px;">ITEM</th>
+            <th style="padding:6px 4px;text-align:center;font-size:10px;color:var(--text2);font-weight:700;width:80px;">${pricingType==='per_kg'?'KG':'QTY'}</th>
+            <th style="padding:6px 4px;text-align:center;font-size:10px;color:var(--text2);font-weight:700;width:65px;">PRICE</th>
+            <th style="padding:6px 4px;text-align:center;font-size:10px;color:var(--text2);font-weight:700;width:55px;">DISC(₹)</th>
+            <th style="padding:6px 4px;text-align:right;font-size:10px;color:var(--orange);font-weight:700;width:50px;">SUB</th>
+            <th style="width:24px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map((item,i) => `<tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:5px 4px;">
+              <input list="items_${serviceId}_${i}" type="text" value="${item.name||''}"
+                onchange="updateItemField('${serviceId}',${i},'name',this.value);autoFillPriceOnChange('${serviceId}',${i},'${serviceName}')"
+                oninput="updateItemField('${serviceId}',${i},'name',this.value)"
+                placeholder="${getServicePlaceholder(serviceId)}"
+                style="width:100%;min-width:85px;border:1px solid var(--border);border-radius:5px;padding:5px 6px;font-size:12px;font-family:'Poppins',sans-serif;outline:none;box-sizing:border-box;">
+              <datalist id="items_${serviceId}_${i}">
+                ${savedItems.map(si=>`<option value="${si.name}">`).join('')}
+              </datalist>
+            </td>
+            <td style="padding:5px 4px;">
               ${pricingType==='per_kg' ? `
                 <input type="number" min="0.1" step="0.1" value="${item.qty||1}"
                   onchange="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||0.1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                   oninput="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||0.1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                   placeholder="KG"
-                  style="width:70px;text-align:center;border:1.5px solid var(--orange);border-radius:6px;padding:8px 4px;font-size:13px;font-weight:700;color:var(--orange);">
-                <span style="font-size:11px;color:var(--text2);font-weight:600;">KG</span>
+                  style="width:52px;text-align:center;border:1.5px solid var(--orange);border-radius:6px;padding:5px 4px;font-size:13px;font-weight:700;color:var(--orange);">
               ` : `
-                <button onclick="changeQty('${serviceId}',${i},-1)" style="width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:white;cursor:pointer;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;">−</button>
-                <input type="number" min="1" step="1" value="${item.qty||1}"
-                  onchange="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
-                  oninput="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
-                  style="width:40px;text-align:center;border:1.5px solid var(--border);border-radius:6px;padding:6px 4px;font-size:14px;font-weight:700;">
-                <button onclick="changeQty('${serviceId}',${i},1)" style="width:28px;height:28px;border-radius:6px;border:none;background:var(--orange);color:white;cursor:pointer;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;">+</button>
+                <div style="display:flex;align-items:center;gap:1px;justify-content:center;">
+                  <button onclick="changeQty('${serviceId}',${i},-1)" style="width:20px;height:20px;border-radius:4px;border:1px solid var(--border);background:white;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;">−</button>
+                  <input type="number" min="1" step="1" value="${item.qty||1}"
+                    onchange="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                    oninput="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                    style="width:32px;text-align:center;border:1px solid var(--border);border-radius:4px;padding:3px 1px;font-size:12px;">
+                  <button onclick="changeQty('${serviceId}',${i},1)" style="width:20px;height:20px;border-radius:4px;border:none;background:var(--orange);color:white;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;">+</button>
+                </div>
               `}
-            </div>
-            
-            <button onclick="removeItemRow('${serviceId}',${i})" style="background:rgba(244,67,54,0.1);border:1.5px solid rgba(244,67,54,0.3);border-radius:8px;padding:8px 10px;cursor:pointer;color:var(--danger);font-size:16px;">🗑</button>
-          </div>
-          
-          <!-- Row 2: Column Headers -->
-          <div style="display:flex;gap:8px;padding:6px 0 4px;">
-            <div style="flex:1;">
-              <span style="font-size:10px;color:var(--text2);font-weight:700;text-transform:uppercase;">Details</span>
-            </div>
-            <div style="width:50px;text-align:center;">
-              <span style="font-size:10px;color:var(--text2);font-weight:700;text-transform:uppercase;">Price</span>
-            </div>
-            <div style="width:45px;text-align:center;">
-              <span style="font-size:10px;color:#0277BD;font-weight:700;text-transform:uppercase;">Disc</span>
-            </div>
-            <div style="width:65px;text-align:center;">
-              <span style="font-size:10px;color:var(--orange);font-weight:700;text-transform:uppercase;">Total</span>
-            </div>
-          </div>
-          
-          <!-- Row 3: Input Fields -->
-          <div style="display:flex;gap:8px;align-items:center;">
-            <div style="flex:1;">
-              <input type="text" value="${item.details||''}" maxlength="200"
-                onchange="updateItemField('${serviceId}',${i},'details',this.value)"
-                oninput="updateItemField('${serviceId}',${i},'details',this.value)"
-                placeholder="color, brand, notes..."
-                style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:'Poppins',sans-serif;outline:none;">
-            </div>
-            
-            <div style="width:50px;">
+            </td>
+            <td style="padding:5px 4px;">
               <input type="number" min="0" step="0.5" value="${item.price||''}"
                 onchange="updateItemField('${serviceId}',${i},'price',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                 oninput="updateItemField('${serviceId}',${i},'price',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                 placeholder="0"
-                style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:7px 4px;font-size:13px;text-align:center;font-weight:700;">
-            </div>
-            
-            <div style="width:45px;">
+                style="width:100%;border:1px solid var(--border);border-radius:5px;padding:5px 4px;font-size:12px;text-align:center;">
+            </td>
+            <td style="padding:5px 4px;">
               <input type="number" min="0" step="1" value="${item.discount||0}"
                 onchange="updateItemField('${serviceId}',${i},'discount',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                 oninput="updateItemField('${serviceId}',${i},'discount',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                 placeholder="0"
-                style="width:100%;border:1.5px solid #29B6F6;border-radius:6px;padding:7px 4px;font-size:13px;text-align:center;font-weight:700;color:#0277BD;">
-            </div>
-            
-            <div style="width:65px;text-align:center;padding:8px;background:rgba(255,107,0,0.1);border-radius:8px;border:1.5px solid rgba(255,107,0,0.2);">
-              <div style="font-weight:800;font-size:16px;color:var(--orange);" id="itemTotal_${serviceId}_${i}">₹${calcSub(item).toFixed(0)}</div>
-            </div>
-          </div>
-        </div>
-      `).join('')}
-      
-      <button class="add-item-btn" onclick="addItemRow('${serviceId}','${serviceName}','${pricingType}')" style="width:100%;padding:10px;background:rgba(255,107,0,0.1);border:1.5px dashed var(--orange);border-radius:8px;color:var(--orange);font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
-        <span style="font-size:16px;">+</span> Add Another Item
-      </button>
+                style="width:100%;border:1px solid #29B6F6;border-radius:5px;padding:5px 4px;font-size:12px;text-align:center;color:#0277BD;">
+            </td>
+            <td style="padding:5px 4px;text-align:right;font-weight:800;font-size:13px;color:var(--orange);white-space:nowrap;">₹${calcSub(item).toFixed(0)}</td>
+            <td style="padding:5px 2px;"><button onclick="removeItemRow('${serviceId}',${i})" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:14px;padding:2px;">🗑</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      </div>
+      <button class="add-item-btn" onclick="addItemRow('${serviceId}','${serviceName}','${pricingType}')">+ Add Item</button>
     </div>`;
   };
 
   const div = document.createElement('div');
   div.innerHTML = renderTable();
   container.appendChild(div.firstElementChild);
-}
-
-// Handle item selection from dropdown
-function handleItemSelection(serviceId, rowIndex, selectedValue, serviceName, pricingType) {
-  if (selectedValue === '__ADD_CUSTOM__') {
-    // Show custom item dialog
-    showAddCustomItemDialog(serviceId, rowIndex, serviceName, pricingType);
-  } else if (selectedValue) {
-    // Auto-fill from saved item (including default discount)
-    const services = DB.get('services') || [];
-    const svc = services.find(s => s.id === serviceId);
-    if (svc && svc.items) {
-      const match = svc.items.find(i => i.name === selectedValue);
-      if (match) {
-        serviceItemsData[serviceId][rowIndex].name = match.name;
-        serviceItemsData[serviceId][rowIndex].price = match.price;
-        serviceItemsData[serviceId][rowIndex].discount = match.discount || 0;
-        renderServiceItems(serviceId, serviceName, pricingType, serviceItemsData[serviceId]);
-        updatePaymentSummary();
-      }
-    }
-  } else {
-    // Clear selection
-    serviceItemsData[serviceId][rowIndex].name = '';
-    serviceItemsData[serviceId][rowIndex].price = '';
-    serviceItemsData[serviceId][rowIndex].discount = 0;
-    renderServiceItems(serviceId, serviceName, pricingType, serviceItemsData[serviceId]);
-    updatePaymentSummary();
-  }
-}
-
-// Show dialog to add custom item
-function showAddCustomItemDialog(serviceId, rowIndex, serviceName, pricingType) {
-  const dialog = `
-    <div style="background:white;border-radius:16px;padding:24px;max-width:400px;width:100%;">
-      <h3 style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:8px;">Add Custom Item</h3>
-      <p style="font-size:13px;color:var(--text2);margin-bottom:20px;">This item will be saved to <strong>${serviceName}</strong> for future orders.</p>
-      
-      <div style="margin-bottom:16px;">
-        <label style="display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">Item Name *</label>
-        <input type="text" id="customItemName" placeholder="e.g., Blue Jeans, White Formal Shirt"
-          style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;">
-      </div>
-      
-      <div style="margin-bottom:16px;">
-        <label style="display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">Price (₹) *</label>
-        <input type="number" id="customItemPrice" min="0" step="0.5" placeholder="0"
-          style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;">
-      </div>
-      
-      <div style="margin-bottom:20px;">
-        <label style="display:block;font-size:12px;font-weight:700;color:#0277BD;margin-bottom:6px;">Default Discount (₹)</label>
-        <input type="number" id="customItemDiscount" min="0" step="1" placeholder="0" value="0"
-          style="width:100%;padding:10px;border:1.5px solid #29B6F6;border-radius:8px;font-size:14px;">
-      </div>
-      
-      <div style="display:flex;gap:10px;">
-        <button onclick="closeModal('customItemModal')" 
-          style="flex:1;padding:12px;background:var(--card2);border:1.5px solid var(--border);border-radius:8px;font-weight:700;cursor:pointer;">
-          Cancel
-        </button>
-        <button onclick="saveCustomItem('${serviceId}',${rowIndex},'${serviceName}','${pricingType}')"
-          style="flex:1;padding:12px;background:var(--orange);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;">
-          Save Item
-        </button>
-      </div>
-    </div>`;
-  
-  const modal = document.getElementById('customItemModal');
-  if (!modal) {
-    const newModal = document.createElement('div');
-    newModal.id = 'customItemModal';
-    newModal.className = 'modal';
-    newModal.innerHTML = `<div class="modal-content">${dialog}</div>`;
-    document.body.appendChild(newModal);
-  } else {
-    modal.querySelector('.modal-content').innerHTML = dialog;
-  }
-  
-  openModal('customItemModal');
-  setTimeout(() => document.getElementById('customItemName').focus(), 100);
-}
-
-// Save custom item to service master list
-function saveCustomItem(serviceId, rowIndex, serviceName, pricingType) {
-  const name = document.getElementById('customItemName').value.trim();
-  const price = parseFloat(document.getElementById('customItemPrice').value);
-  const discount = parseFloat(document.getElementById('customItemDiscount').value) || 0;
-  
-  if (!name) {
-    showToast('Please enter item name', 'warning');
-    return;
-  }
-  
-  if (!price || price <= 0) {
-    showToast('Please enter valid price', 'warning');
-    return;
-  }
-  
-  // Add to service's master item list
-  const services = DB.get('services') || [];
-  const svcIndex = services.findIndex(s => s.id === serviceId);
-  
-  if (svcIndex !== -1) {
-    if (!services[svcIndex].items) services[svcIndex].items = [];
-    
-    // Check if already exists
-    const exists = services[svcIndex].items.find(i => i.name.toLowerCase() === name.toLowerCase());
-    if (exists) {
-      showToast('Item already exists in this service', 'warning');
-      return;
-    }
-    
-    services[svcIndex].items.push({ name, price, discount });
-    DB.set('services', services);
-    
-    // Add to current order
-    serviceItemsData[serviceId][rowIndex].name = name;
-    serviceItemsData[serviceId][rowIndex].price = price;
-    serviceItemsData[serviceId][rowIndex].discount = discount;
-    
-    closeModal('customItemModal');
-    renderServiceItems(serviceId, serviceName, pricingType, serviceItemsData[serviceId]);
-    updatePaymentSummary();
-    
-    showToast(`✅ "${name}" added to ${serviceName}`, 'success');
-  }
 }
 
 function autoFillPrice(serviceId, rowIndex, serviceName) {
@@ -2695,6 +2054,7 @@ function autoFillPrice(serviceId, rowIndex, serviceName) {
   const match = svc.items.find(i => i.name.toLowerCase() === itemName.toLowerCase());
   if (match && !serviceItemsData[serviceId][rowIndex].price) {
     serviceItemsData[serviceId][rowIndex].price = match.price;
+    serviceItemsData[serviceId][rowIndex].discount = match.discount || 0;
     renderServiceItems(serviceId, serviceName, svc.pricingType, serviceItemsData[serviceId]);
     updatePaymentSummary();
   }
@@ -2767,13 +2127,12 @@ function changeQty(serviceId, rowIndex, delta) {
   const current = parseFloat(serviceItemsData[serviceId][rowIndex].qty) || 1;
   const newQty = Math.max(1, Math.round(current + delta));
   serviceItemsData[serviceId][rowIndex].qty = newQty;
-  
-  // Update qty input value directly in the new div-based layout
+  // Update qty input value directly without re-rendering
   const svcEl = document.getElementById('svc_' + serviceId);
   if (svcEl) {
-    const itemCards = svcEl.querySelectorAll('div[style*="background:white"]');
-    if (itemCards[rowIndex]) {
-      const qtyInput = itemCards[rowIndex].querySelector('input[type="number"][min="1"]');
+    const rows = svcEl.querySelectorAll('tbody tr');
+    if (rows[rowIndex]) {
+      const qtyInput = rows[rowIndex].querySelector('input[type="number"]');
       if (qtyInput) qtyInput.value = newQty;
     }
   }
@@ -2813,7 +2172,7 @@ function getAutoName(serviceId, pricingType) {
 function addItemRow(serviceId, serviceName, pricingType) {
   const autoName = getAutoName(serviceId, pricingType);
   const autoPrice = getDefaultPrice(serviceId);
-  serviceItemsData[serviceId].push({ name:autoName, qty:1, price:autoPrice, subtotal:0, details:'', discount:0 });
+  serviceItemsData[serviceId].push({ name:autoName, qty:1, price:autoPrice, subtotal:0, discount:0 });
   renderServiceItems(serviceId, serviceName, pricingType, serviceItemsData[serviceId]);
   updatePaymentSummary();
 }
@@ -2852,11 +2211,14 @@ function updateSubDisplay(serviceId, rowIndex) {
   const item = (serviceItemsData[serviceId]||[])[rowIndex];
   if (!item) return;
   const sub = calcItemSub(item);
-  
-  // Update the total display in the new div-based layout
-  const totalEl = document.getElementById('itemTotal_' + serviceId + '_' + rowIndex);
-  if (totalEl) {
-    totalEl.textContent = '₹' + sub.toFixed(0);
+  // Find sub cell: each row has 6 cells, sub is 5th (index 4)
+  const tableId = 'svc_' + serviceId;
+  const svcEl = document.getElementById(tableId);
+  if (!svcEl) return;
+  const rows = svcEl.querySelectorAll('tbody tr');
+  if (rows[rowIndex]) {
+    const cells = rows[rowIndex].querySelectorAll('td');
+    if (cells[4]) cells[4].textContent = '₹' + sub.toFixed(0);
   }
 }
 
@@ -2869,32 +2231,12 @@ function calcOrderTotal() {
 }
 
 function updatePaymentSummary() {
-  let subtotalBeforeDiscount = 0;
-  let totalItemDiscounts = 0;
-  
-  // Calculate subtotal (before discounts) and sum all per-item discounts
+  let total = 0;
   Object.values(serviceItemsData).forEach(items => {
-    items.forEach(item => {
-      const qty = parseFloat(item.qty) || 1;
-      const price = parseFloat(item.price) || 0;
-      const itemDiscount = parseFloat(item.discount) || 0;
-      
-      subtotalBeforeDiscount += (qty * price);
-      totalItemDiscounts += itemDiscount;
-    });
+    items.forEach(item => { total += calcItemSub(item); });
   });
-  
-  // Auto-populate discount field with sum of per-item discounts
-  const discountField = document.getElementById('f_discount');
-  if (discountField) {
-    discountField.value = totalItemDiscounts.toFixed(0);
-  }
-  
-  const total = Math.max(0, subtotalBeforeDiscount - totalItemDiscounts);
   const advance = parseFloat(document.getElementById('f_advancePaid')?.value) || 0;
   const balance = Math.max(0, total - advance);
-  
-  if(document.getElementById('ps_subtotal')) document.getElementById('ps_subtotal').textContent = '₹' + subtotalBeforeDiscount.toFixed(2);
   if(document.getElementById('ps_total')) document.getElementById('ps_total').textContent = '₹' + total.toFixed(2);
   if(document.getElementById('ps_balance')) document.getElementById('ps_balance').textContent = '₹' + balance.toFixed(2);
 }
@@ -2966,12 +2308,7 @@ function saveOrder() {
   const services = DB.get('services') || [];
   const orderServices = Object.entries(serviceItemsData).map(([serviceId, items]) => {
     const svc = services.find(s => s.id === serviceId);
-    // Calculate service total BEFORE discounts
-    const serviceTotal = items.reduce((sum, i) => {
-      const qty = parseFloat(i.qty) || 1;
-      const price = parseFloat(i.price) || 0;
-      return sum + (qty * price);
-    }, 0);
+    const serviceTotal = items.reduce((sum, i) => sum + calcItemSub(i), 0);
     return {
       serviceId, serviceName: svc?svc.name:'', pricingType: svc?svc.pricingType:'per_item',
       items: items.filter(i => i.name||i.price),
@@ -2979,13 +2316,7 @@ function saveOrder() {
     };
   });
 
-  // Calculate subtotal (before discounts) and total discounts
-  const subtotal = orderServices.reduce((sum, s) => sum + s.serviceTotal, 0);
-  const totalItemDiscounts = Object.values(serviceItemsData).reduce((sum, items) => {
-    return sum + items.reduce((itemSum, item) => itemSum + (parseFloat(item.discount) || 0), 0);
-  }, 0);
-  
-  const finalTotal = Math.max(0, subtotal - totalItemDiscounts);
+  const totalAmount = orderServices.reduce((sum, s) => sum + s.serviceTotal, 0);
   const paidAmount = parseFloat(document.getElementById('f_advancePaid').value) || 0;
   const paymentMode = document.getElementById('f_paymentMode').value;
   const notes = document.getElementById('f_notes').value.trim();
@@ -3006,7 +2337,7 @@ function saveOrder() {
       orders[idx] = {
         ...orders[idx],
         customerName: name, customerPhone: phone, customerPhone2: phone2, customerAddress: address,
-        orderDate, dueDate, services: orderServices, subtotal: subtotal, discount: totalItemDiscounts, totalAmount: finalTotal, paidAmount, paymentMode, notes,
+        orderDate, dueDate, services: orderServices, totalAmount, paidAmount, paymentMode, notes,
         updatedAt: new Date().toISOString(), updatedBy: currentUser.name
       };
     }
@@ -3022,7 +2353,7 @@ function saveOrder() {
     const newOrder = {
       id: 'ord_' + Date.now(), orderNo, orderDate, dueDate,
       customerName: name, customerPhone: phone, customerPhone2: phone2, customerAddress: address,
-      services: orderServices, subtotal: subtotal, discount: totalItemDiscounts, totalAmount: finalTotal, paidAmount, paymentMode, notes,
+      services: orderServices, totalAmount, paidAmount, paymentMode, notes,
       status: 'received',
       trackingCode: generateTrackingCode('ord_' + Date.now()),
       trackingExpiry: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
@@ -3108,21 +2439,15 @@ function showOrderDetail(orderId) {
           <th style="padding:5px 8px;text-align:left;">Item</th>
           <th style="padding:5px 8px;text-align:center;">Qty</th>
           <th style="padding:5px 8px;text-align:right;">Price</th>
-          <th style="padding:5px 8px;text-align:right;color:#0277BD;">Disc</th>
           <th style="padding:5px 8px;text-align:right;">Sub</th>
         </tr>
-        ${(svc.items||[]).map(item => {
-          const disc = parseFloat(item.discount)||0;
-          const subtotal = Math.max(0, ((item.qty||1)*(item.price||0)) - disc);
-          return `<tr>
-            <td style="padding:5px 8px;border-bottom:1px solid var(--border);">${item.name||'-'}${item.details ? '<br><span style="font-size:10px;color:#999;">'+item.details+'</span>' : ''}</td>
-            <td style="padding:5px 8px;text-align:center;border-bottom:1px solid var(--border);">${item.qty||1}</td>
-            <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);">₹${item.price||0}</td>
-            <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);color:#0277BD;">${disc > 0 ? '₹'+disc : '-'}</td>
-            <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);font-weight:700;">₹${subtotal.toFixed(0)}</td>
-          </tr>`;
-        }).join('')}
-        <tr><td colspan="4" style="padding:5px 8px;font-weight:700;text-align:right;">Service Total:</td>
+        ${(svc.items||[]).map(item => `<tr>
+          <td style="padding:5px 8px;border-bottom:1px solid var(--border);">${item.name||'-'}</td>
+          <td style="padding:5px 8px;text-align:center;border-bottom:1px solid var(--border);">${item.qty||1}</td>
+          <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);">₹${item.price||0}</td>
+          <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);font-weight:700;">₹${((item.qty||1)*(item.price||0)).toFixed(0)}</td>
+        </tr>`).join('')}
+        <tr><td colspan="3" style="padding:5px 8px;font-weight:700;text-align:right;">Service Total:</td>
           <td style="padding:5px 8px;text-align:right;font-weight:800;color:var(--orange);">₹${(svc.serviceTotal||0).toFixed(0)}</td></tr>
       </table>
     </div>`).join('');
@@ -3164,9 +2489,6 @@ function showOrderDetail(orderId) {
     </div>
 
     <div style="background:var(--dark);border-radius:12px;padding:14px;margin-bottom:12px;color:white;">
-      <div class="inv-total-row"><span>Subtotal</span><strong>₹${(order.subtotal||order.totalAmount||0).toFixed(2)}</strong></div>
-      ${(order.discount && order.discount > 0) ? `<div class="inv-total-row"><span>Discount</span><strong style="color:#69f0ae;">- ₹${order.discount.toFixed(2)}</strong></div>` : `<div class="inv-total-row"><span>Discount</span><strong style="opacity:0.5;">N/A</strong></div>`}
-      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.2);margin:8px 0;">
       <div class="inv-total-row"><span>Total Amount</span><strong>₹${(order.totalAmount||0).toFixed(2)}</strong></div>
       <div class="inv-total-row"><span>Advance Paid</span><strong>₹${(order.paidAmount||0).toFixed(2)}</strong></div>
       <div class="inv-total-row" style="color:${balance>0?'#ff8a80':'#69f0ae'};font-weight:800;">
@@ -3471,7 +2793,7 @@ function showInvoice(orderId) {
       const disc = parseFloat(item.discount)||0;
       const sub = Math.max(0,((parseFloat(item.qty)||1)*(parseFloat(item.price)||0))-disc);
       return `<tr>
-        <td style="padding:4px 8px;">${item.name||'-'}${item.details ? '<br><span style="font-size:10px;color:#999;">'+item.details+'</span>' : ''}</td>
+        <td style="padding:4px 8px;">${item.name||'-'}</td>
         <td style="padding:4px 8px;text-align:center;">${item.qty||1}</td>
         <td style="padding:4px 8px;text-align:right;">₹${item.price||0}</td>
         <td style="padding:4px 8px;text-align:right;color:#0277BD;">${disc>0?'-₹'+disc:'-'}</td>
@@ -3512,9 +2834,6 @@ function showInvoice(orderId) {
         <tbody>${servicesHtml}</tbody>
       </table>
       <div class="inv-total">
-        <div class="inv-total-row"><span>Subtotal</span><strong>₹${(order.subtotal||order.totalAmount||0).toFixed(2)}</strong></div>
-        ${(order.discount && order.discount > 0) ? `<div class="inv-total-row"><span>Discount</span><strong style="color:#4CAF50;">- ₹${order.discount.toFixed(2)}</strong></div>` : `<div class="inv-total-row"><span>Discount</span><strong style="opacity:0.5;">N/A</strong></div>`}
-        <hr style="border:none;border-top:2px solid #eee;margin:8px 0;">
         <div class="inv-total-row"><span>Total Amount</span><strong>₹${(order.totalAmount||0).toFixed(2)}</strong></div>
         <div class="inv-total-row"><span>Advance Paid</span><strong>₹${(order.paidAmount||0).toFixed(2)}</strong></div>
         <div class="inv-total-row main"><span>${balance>0?'Balance Due':'Amount Paid'}</span><strong>₹${balance>0?balance.toFixed(2):(order.totalAmount||0).toFixed(2)}</strong></div>
@@ -4112,8 +3431,6 @@ function renderCustomers() {
   filtered.sort((a,b) => new Date(b.lastVisit||0) - new Date(a.lastVisit||0));
 
   const container = document.getElementById('customersList');
-  if (!container) return; // Exit if element doesn't exist
-  
   if (filtered.length === 0) {
     container.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div><h3>No customers yet</h3><p>Customers are added automatically when you create orders</p></div>';
     return;
@@ -4595,7 +3912,7 @@ function showServiceItems(serviceId) {
       <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
         <div style="flex:1;font-weight:600;">${item.name}</div>
         <div style="font-family:'Nunito',sans-serif;font-weight:700;color:var(--text2);">₹${item.price}</div>
-        ${item.discount ? `<div style="font-family:'Nunito',sans-serif;font-weight:700;color:#0277BD;font-size:11px;">-₹${item.discount}</div>` : ''}
+        ${item.discount ? `<div style="font-family:'Nunito',sans-serif;font-weight:700;color:#0277BD;font-size:12px;">-₹${item.discount}</div>` : ''}
         <button class="btn btn-sm btn-secondary" onclick="editItem('${serviceId}',${i})">✏️</button>
         <button class="btn btn-sm btn-danger" onclick="deleteItem('${serviceId}',${i})">🗑</button>
       </div>`).join('');
@@ -5103,10 +4420,6 @@ function confirmAction() {
 let toastTimeout;
 function showToast(msg, type) {
   const toast = document.getElementById('toast');
-  if (!toast) {
-    console.log('Toast:', msg, type);
-    return;
-  }
   toast.textContent = msg;
   toast.className = 'toast show' + (type?' '+type:'');
   clearTimeout(toastTimeout);
@@ -5117,6 +4430,9 @@ function showToast(msg, type) {
 // ORDER TRACKING PAGE
 // ============================================================
 function showTrackingPage(trackingCode) {
+  const orders = DB.get('orders') || [];
+  const order = orders.find(o => o.trackingCode === trackingCode);
+  
   document.getElementById('mainApp').style.display = 'none';
   document.getElementById('loginPage').style.display = 'none';
   
@@ -5124,128 +4440,103 @@ function showTrackingPage(trackingCode) {
   trackingPage.id = 'trackingPage';
   trackingPage.style.cssText = 'min-height:100vh;background:linear-gradient(135deg,#1A1A2E,#16213E);padding:20px;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;';
   
-  // Show loading
-  trackingPage.innerHTML = `
-    <div style="background:white;border-radius:20px;padding:40px;max-width:500px;text-align:center;">
-      <div style="font-size:48px;margin-bottom:16px;">⏳</div>
-      <h2 style="font-weight:800;font-size:24px;color:#333;margin-bottom:12px;">Loading...</h2>
-      <p style="color:#666;font-size:14px;">Fetching order details</p>
-    </div>`;
-  
-  document.body.appendChild(trackingPage);
-  
-  // Fetch from Firebase (cloud), not localStorage
-  firestore.collection('orders').where('trackingCode', '==', trackingCode).limit(1).get()
-    .then(snapshot => {
-      if (snapshot.empty) {
-        // Order not found
-        trackingPage.innerHTML = `
-          <div style="background:white;border-radius:20px;padding:40px;max-width:500px;text-align:center;">
-            <div style="font-size:64px;margin-bottom:16px;">❌</div>
-            <h2 style="font-weight:800;font-size:24px;color:#333;margin-bottom:12px;">Order Not Found</h2>
-            <p style="color:#666;font-size:14px;margin-bottom:24px;">This tracking code is invalid or has expired.</p>
-            <div style="font-size:12px;color:#999;">Tracking code: <strong>${trackingCode}</strong></div>
-          </div>`;
-        return;
-      }
-      
-      const order = snapshot.docs[0].data();
-      const isExpired = order.trackingExpiry && new Date() > new Date(order.trackingExpiry);
-      
-      if (isExpired) {
-        trackingPage.innerHTML = `
-          <div style="background:white;border-radius:20px;padding:40px;max-width:500px;text-align:center;">
-            <div style="font-size:64px;margin-bottom:16px;">⏰</div>
-            <h2 style="font-weight:800;font-size:24px;color:#333;margin-bottom:12px;">Tracking Link Expired</h2>
-            <p style="color:#666;font-size:14px;margin-bottom:24px;">
-              This tracking link expired after 60 days.<br>Please contact us for order status.
-            </p>
-            <div style="font-size:12px;color:#999;">Order: <strong>${order.orderNo}</strong></div>
-          </div>`;
-      } else {
-        const statusLabels = {
-          received:'Received',
-          inprogress:'In-Progress',
-          ready:'Ready',
-          paid_delivered:'Delivered & Paid',
-          unpaid_delivered:'Delivered (Payment Pending)',
-          cancelled:'Cancelled'
-        };
-        
-        const statusColors = {
-          received:'#2196F3',
-          inprogress:'#FF9800',
-          ready:'#4CAF50',
-          paid_delivered:'#4CAF50',
-          unpaid_delivered:'#FF9800',
-          cancelled:'#F44336'
-        };
-        
-        const currentColor = statusColors[order.status] || '#666';
-        const statusLabel = statusLabels[order.status] || order.status;
-        const isDelivered = ['paid_delivered','unpaid_delivered'].includes(order.status);
-        
-        trackingPage.innerHTML = `
-          <div style="background:white;border-radius:20px;padding:32px;max-width:600px;width:100%;">
-            <div style="text-align:center;margin-bottom:32px;">
-              <h2 style="font-weight:800;font-size:28px;color:#333;margin-bottom:8px;">Order ${order.orderNo}</h2>
-              <p style="color:#666;font-size:14px;">${order.customerName}</p>
-            </div>
-            
-            <div style="background:${currentColor};color:white;border-radius:16px;padding:24px;margin-bottom:24px;text-align:center;">
-              <div style="font-size:48px;margin-bottom:12px;">
-                ${isDelivered ? '🎉' : order.status === 'ready' ? '✅' : order.status === 'inprogress' ? '⏳' : '📦'}
-              </div>
-              <div style="font-weight:800;font-size:24px;margin-bottom:8px;">${statusLabel}</div>
-              ${!isDelivered ? `<div style="font-size:14px;opacity:0.9;">Expected Ready: ${formatDate(order.dueDate)}</div>` : ''}
-            </div>
-            
-            <div style="margin-bottom:24px;">
-              <div style="font-weight:700;font-size:13px;color:#666;margin-bottom:12px;text-transform:uppercase;">Order Timeline</div>
-              ${(order.statusHistory || []).map((h, i) => `
-                <div style="display:flex;gap:12px;margin-bottom:12px;align-items:start;">
-                  <div style="width:32px;height:32px;border-radius:50%;background:${i === order.statusHistory.length - 1 ? currentColor : '#E0E0E0'};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;">
-                    ${i === order.statusHistory.length - 1 ? '●' : '✓'}
-                  </div>
-                  <div style="flex:1;">
-                    <div style="font-weight:700;font-size:14px;color:#333;">${statusLabels[h.status] || h.status}</div>
-                    <div style="font-size:12px;color:#999;">${formatDateTime(h.changedAt)}</div>
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-            
-            <div style="background:rgba(255,107,0,0.08);border-radius:12px;padding:16px;">
-              <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-                <span style="color:#666;font-size:13px;">Total Amount</span>
-                <span style="font-weight:700;font-size:15px;color:#333;">₹${order.totalAmount}</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-                <span style="color:#666;font-size:13px;">Paid</span>
-                <span style="font-weight:700;font-size:15px;color:#4CAF50;">₹${order.paidAmount || 0}</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:2px solid rgba(0,0,0,0.1);">
-                <span style="color:#333;font-weight:700;font-size:14px;">Balance Due</span>
-                <span style="font-weight:800;font-size:18px;color:#FF6B00;">₹${(order.totalAmount || 0) - (order.paidAmount || 0)}</span>
-              </div>
-            </div>
-            
-            <div style="text-align:center;margin-top:24px;padding-top:24px;border-top:1px solid #ddd;">
-              <p style="font-size:12px;color:#999;">Link expires: ${formatDate(order.trackingExpiry)}</p>
-            </div>
-          </div>`;
-      }
-    })
-    .catch(error => {
-      console.error('Tracking fetch error:', error);
+  if (!order) {
+    trackingPage.innerHTML = `
+      <div style="background:white;border-radius:20px;padding:40px;max-width:500px;text-align:center;">
+        <div style="font-size:64px;margin-bottom:16px;">❌</div>
+        <h2 style="font-weight:800;font-size:24px;color:#333;margin-bottom:12px;">Order Not Found</h2>
+        <p style="color:#666;font-size:14px;margin-bottom:24px;">This tracking code is invalid or has expired.</p>
+        <div style="font-size:12px;color:#999;">Tracking code: <strong>${trackingCode}</strong></div>
+      </div>`;
+  } else {
+    const isExpired = order.trackingExpiry && new Date() > new Date(order.trackingExpiry);
+    
+    if (isExpired) {
       trackingPage.innerHTML = `
         <div style="background:white;border-radius:20px;padding:40px;max-width:500px;text-align:center;">
-          <div style="font-size:64px;margin-bottom:16px;">⚠️</div>
-          <h2 style="font-weight:800;font-size:24px;color:#333;margin-bottom:12px;">Error Loading Order</h2>
-          <p style="color:#666;font-size:14px;margin-bottom:24px;">Unable to fetch order details. Please try again later.</p>
-          <div style="font-size:12px;color:#999;">Error: ${error.message}</div>
+          <div style="font-size:64px;margin-bottom:16px;">⏰</div>
+          <h2 style="font-weight:800;font-size:24px;color:#333;margin-bottom:12px;">Tracking Link Expired</h2>
+          <p style="color:#666;font-size:14px;margin-bottom:24px;">
+            This tracking link expired after 60 days.<br>Please contact us for order status.
+          </p>
+          <div style="font-size:12px;color:#999;">Order: <strong>${order.orderNo}</strong></div>
         </div>`;
-    });
+    } else {
+      const statusLabels = {
+        received:'Received',
+        inprogress:'In-Progress',
+        ready:'Ready',
+        paid_delivered:'Delivered & Paid',
+        unpaid_delivered:'Delivered (Payment Pending)',
+        cancelled:'Cancelled'
+      };
+      
+      const statusColors = {
+        received:'#2196F3',
+        inprogress:'#FF9800',
+        ready:'#4CAF50',
+        paid_delivered:'#4CAF50',
+        unpaid_delivered:'#FF9800',
+        cancelled:'#F44336'
+      };
+      
+      const currentColor = statusColors[order.status] || '#666';
+      const statusLabel = statusLabels[order.status] || order.status;
+      const isDelivered = ['paid_delivered','unpaid_delivered'].includes(order.status);
+      
+      trackingPage.innerHTML = `
+        <div style="background:white;border-radius:20px;padding:32px;max-width:600px;width:100%;">
+          <div style="text-align:center;margin-bottom:32px;">
+            <h2 style="font-weight:800;font-size:28px;color:#333;margin-bottom:8px;">Order ${order.orderNo}</h2>
+            <p style="color:#666;font-size:14px;">${order.customerName}</p>
+          </div>
+          
+          <div style="background:${currentColor};color:white;border-radius:16px;padding:24px;margin-bottom:24px;text-align:center;">
+            <div style="font-size:48px;margin-bottom:12px;">
+              ${isDelivered ? '🎉' : order.status === 'ready' ? '✅' : order.status === 'inprogress' ? '⏳' : '📦'}
+            </div>
+            <div style="font-weight:800;font-size:24px;margin-bottom:8px;">${statusLabel}</div>
+            ${!isDelivered ? `<div style="font-size:14px;opacity:0.9;">Expected Ready: ${formatDate(order.dueDate)}</div>` : ''}
+          </div>
+          
+          <div style="margin-bottom:24px;">
+            <div style="font-weight:700;font-size:13px;color:#666;margin-bottom:12px;text-transform:uppercase;">Order Timeline</div>
+            ${(order.statusHistory || []).map((h, i) => `
+              <div style="display:flex;gap:12px;margin-bottom:12px;align-items:start;">
+                <div style="width:32px;height:32px;border-radius:50%;background:${i === order.statusHistory.length - 1 ? currentColor : '#E0E0E0'};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;">
+                  ${i === order.statusHistory.length - 1 ? '●' : '✓'}
+                </div>
+                <div style="flex:1;">
+                  <div style="font-weight:700;font-size:14px;color:#333;">${statusLabels[h.status] || h.status}</div>
+                  <div style="font-size:12px;color:#999;">${formatDateTime(h.changedAt)}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          
+          <div style="background:rgba(255,107,0,0.08);border-radius:12px;padding:16px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+              <span style="color:#666;font-size:13px;">Total Amount</span>
+              <span style="font-weight:700;font-size:15px;color:#333;">₹${order.totalAmount}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+              <span style="color:#666;font-size:13px;">Paid</span>
+              <span style="font-weight:700;font-size:15px;color:#4CAF50;">₹${order.paidAmount || 0}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:2px solid rgba(0,0,0,0.1);">
+              <span style="color:#333;font-weight:700;font-size:14px;">Balance Due</span>
+              <span style="font-weight:800;font-size:18px;color:#FF6B00;">₹${(order.totalAmount || 0) - (order.paidAmount || 0)}</span>
+            </div>
+          </div>
+          
+          <div style="text-align:center;margin-top:24px;padding-top:24px;border-top:1px solid #ddd;">
+            <p style="font-size:12px;color:#999;">Link expires: ${formatDate(order.trackingExpiry)}</p>
+          </div>
+        </div>`;
+    }
+  }
+  
+  document.body.appendChild(trackingPage);
 }
 
 // ============================================================
