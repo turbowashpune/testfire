@@ -1952,8 +1952,17 @@ function toggleService(id, name, pricingType, el) {
     if (!serviceItemsData[id]) {
       const autoName = getAutoName(id, pricingType);
       const autoPrice = getDefaultPrice(id);
-      const autoDiscount = getDefaultDiscount(id);
-      serviceItemsData[id] = [{ name:autoName, qty:1, price:autoPrice, subtotal:0, discount:autoDiscount, details:'' }];
+      const discountPerUnit = getDefaultDiscount(id); // This gets per-unit discount from settings
+      serviceItemsData[id] = [{ 
+        name: autoName, 
+        qty: 1, 
+        price: autoPrice, 
+        discountPerUnit: discountPerUnit,
+        discount: discountPerUnit, // For qty=1, total equals per-unit
+        subtotal: 0, 
+        details: '',
+        isCustom: false
+      }];
     }
     renderServiceItems(id, name, pricingType, serviceItemsData[id]);
   } else {
@@ -2008,28 +2017,44 @@ function renderServiceItems(serviceId, serviceName, pricingType, existingItems) 
                 style="width:100%;border:1px solid var(--border);border-radius:5px;padding:5px 6px;font-size:12px;font-family:'Poppins',sans-serif;outline:none;box-sizing:border-box;background:white;">
                 <option value="">Select item...</option>
                 ${savedItems.map(si=>`<option value="${si.name}" ${item.name===si.name?'selected':''}>${si.name}</option>`).join('')}
-                <option value="__custom__" ${!savedItems.find(si=>si.name===item.name) && item.name?'selected':''}>✏️ Custom: ${item.name || 'Type new...'}</option>
+                <option value="__custom__" ${item.isCustom?'selected':''}>✏️ Add New Item...</option>
               </select>
-              ${!savedItems.find(si=>si.name===item.name) && item.name ? `
-                <input type="text" value="${item.name||''}"
-                  onchange="updateItemField('${serviceId}',${i},'name',this.value);reRenderService('${serviceId}','${serviceName}','${pricingType}')"
-                  placeholder="Enter item name..."
-                  style="width:100%;border:1px solid var(--orange);border-radius:5px;padding:5px 6px;font-size:11px;margin-top:4px;box-sizing:border-box;">
+              ${item.isCustom ? `
+                <div style="margin-top:6px;padding:8px;background:rgba(255,107,0,0.08);border-radius:6px;border:1px solid var(--orange);">
+                  <input type="text" value="${item.name||''}"
+                    onchange="updateItemField('${serviceId}',${i},'name',this.value)"
+                    oninput="updateItemField('${serviceId}',${i},'name',this.value)"
+                    placeholder="Item name (e.g., Leather Jacket)"
+                    style="width:100%;border:1px solid var(--orange);border-radius:4px;padding:5px 6px;font-size:11px;margin-bottom:4px;box-sizing:border-box;">
+                  <div style="display:flex;gap:4px;">
+                    <input type="number" min="0" step="0.5" value="${item.price||''}"
+                      onchange="updateItemField('${serviceId}',${i},'price',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                      oninput="updateItemField('${serviceId}',${i},'price',parseFloat(this.value)||0)"
+                      placeholder="Price"
+                      style="flex:1;border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:11px;text-align:center;">
+                    <input type="number" min="0" step="1" value="${item.discountPerUnit||0}"
+                      onchange="updateItemField('${serviceId}',${i},'discountPerUnit',parseFloat(this.value)||0);updateDiscountFromQty('${serviceId}',${i});updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                      oninput="updateItemField('${serviceId}',${i},'discountPerUnit',parseFloat(this.value)||0)"
+                      placeholder="Disc/unit"
+                      style="flex:1;border:1px solid #29B6F6;border-radius:4px;padding:4px 6px;font-size:11px;text-align:center;color:#0277BD;">
+                  </div>
+                  <div style="font-size:9px;color:var(--text3);margin-top:2px;">Enter item details</div>
+                </div>
               ` : ''}
             </td>
             <td style="padding:5px 4px;">
               ${pricingType==='per_kg' ? `
                 <input type="number" min="0.1" step="0.1" value="${item.qty||1}"
-                  onchange="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||0.1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
-                  oninput="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||0.1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                  onchange="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||0.1);updateDiscountFromQty('${serviceId}',${i});updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                  oninput="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||0.1)"
                   placeholder="KG"
                   style="width:50px;text-align:center;border:1.5px solid var(--orange);border-radius:6px;padding:5px 4px;font-size:13px;font-weight:700;color:var(--orange);">
               ` : `
                 <div style="display:flex;align-items:center;gap:1px;justify-content:center;">
                   <button onclick="changeQty('${serviceId}',${i},-1)" style="width:20px;height:20px;border-radius:4px;border:1px solid var(--border);background:white;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;">−</button>
                   <input type="number" min="1" step="1" value="${item.qty||1}"
-                    onchange="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
-                    oninput="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                    onchange="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||1);updateDiscountFromQty('${serviceId}',${i});updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                    oninput="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||1)"
                     style="width:32px;text-align:center;border:1px solid var(--border);border-radius:4px;padding:3px 1px;font-size:12px;">
                   <button onclick="changeQty('${serviceId}',${i},1)" style="width:20px;height:20px;border-radius:4px;border:none;background:var(--orange);color:white;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;">+</button>
                 </div>
@@ -2046,21 +2071,24 @@ function renderServiceItems(serviceId, serviceName, pricingType, existingItems) 
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td colspan="4" style="padding:5px 4px;">
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;">
                 <div style="display:flex;flex-direction:column;gap:2px;">
                   <span style="font-size:9px;color:#0277BD;font-weight:600;text-transform:uppercase;">Disc</span>
                   <input type="number" min="0" step="1" value="${item.discount||0}"
-                    onchange="updateItemField('${serviceId}',${i},'discount',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
-                    oninput="updateItemField('${serviceId}',${i},'discount',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                    onchange="updateItemField('${serviceId}',${i},'discount',parseFloat(this.value)||0);updateDiscountPerUnitFromTotal('${serviceId}',${i});updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                    oninput="updateItemField('${serviceId}',${i},'discount',parseFloat(this.value)||0)"
                     placeholder="0"
                     style="width:55px;border:1px solid #29B6F6;border-radius:5px;padding:4px 6px;font-size:12px;text-align:center;color:#0277BD;">
                 </div>
-                <input type="text" value="${item.details||''}"
-                  onchange="updateItemField('${serviceId}',${i},'details',this.value)"
-                  oninput="updateItemField('${serviceId}',${i},'details',this.value)"
-                  placeholder="Details (color, brand, special instructions...)"
-                  style="flex:1;min-width:150px;border:1px solid rgba(0,0,0,0.1);border-radius:5px;padding:6px 8px;font-size:11px;color:var(--text2);font-style:italic;background:rgba(0,0,0,0.02);">
-                <button onclick="removeItemRow('${serviceId}',${i})" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:16px;padding:4px 6px;">🗑</button>
+                <div style="flex:1;min-width:150px;display:flex;flex-direction:column;gap:2px;">
+                  <span style="font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase;">Details</span>
+                  <input type="text" value="${item.details||''}"
+                    onchange="updateItemField('${serviceId}',${i},'details',this.value)"
+                    oninput="updateItemField('${serviceId}',${i},'details',this.value)"
+                    placeholder="Color, brand, special instructions..."
+                    style="width:100%;border:1px solid rgba(0,0,0,0.1);border-radius:5px;padding:4px 8px;font-size:11px;color:var(--text2);font-style:italic;background:rgba(0,0,0,0.02);">
+                </div>
+                <button onclick="removeItemRow('${serviceId}',${i})" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:16px;padding:4px 6px;align-self:flex-end;">🗑</button>
               </div>
             </td>
           </tr>
@@ -2159,29 +2187,68 @@ function handleItemSelect(serviceId, rowIndex, value, serviceName) {
   const svc = services.find(s => s.id === serviceId);
   
   if (value === '__custom__') {
-    // User wants to enter custom item - keep current name and re-render to show text input
+    // User wants to add new custom item
+    serviceItemsData[serviceId][rowIndex].isCustom = true;
+    serviceItemsData[serviceId][rowIndex].name = '';
+    serviceItemsData[serviceId][rowIndex].price = '';
+    serviceItemsData[serviceId][rowIndex].discountPerUnit = 0;
+    serviceItemsData[serviceId][rowIndex].discount = 0;
     reRenderService(serviceId, serviceName, svc ? svc.pricingType : 'per_item');
     return;
   }
   
   if (!value) {
     // Cleared selection
+    serviceItemsData[serviceId][rowIndex].isCustom = false;
     serviceItemsData[serviceId][rowIndex].name = '';
     serviceItemsData[serviceId][rowIndex].price = '';
+    serviceItemsData[serviceId][rowIndex].discountPerUnit = 0;
     serviceItemsData[serviceId][rowIndex].discount = 0;
     reRenderService(serviceId, serviceName, svc ? svc.pricingType : 'per_item');
     return;
   }
   
   // Selected an item from the list - auto-fill price and discount
+  serviceItemsData[serviceId][rowIndex].isCustom = false;
   serviceItemsData[serviceId][rowIndex].name = value;
   const match = svc && svc.items ? svc.items.find(i => i.name === value) : null;
   if (match) {
     serviceItemsData[serviceId][rowIndex].price = match.price;
-    serviceItemsData[serviceId][rowIndex].discount = match.discount || 0;
+    serviceItemsData[serviceId][rowIndex].discountPerUnit = match.discount || 0;
+    // Calculate total discount = discountPerUnit * qty
+    const qty = parseFloat(serviceItemsData[serviceId][rowIndex].qty) || 1;
+    serviceItemsData[serviceId][rowIndex].discount = (match.discount || 0) * qty;
   }
   reRenderService(serviceId, serviceName, svc ? svc.pricingType : 'per_item');
   updatePaymentSummary();
+}
+
+// Update discount when quantity changes (discount = discountPerUnit × qty)
+function updateDiscountFromQty(serviceId, rowIndex) {
+  const item = serviceItemsData[serviceId][rowIndex];
+  if (!item) return;
+  const discountPerUnit = parseFloat(item.discountPerUnit) || 0;
+  const qty = parseFloat(item.qty) || 1;
+  item.discount = discountPerUnit * qty;
+  // Update the discount display without full re-render
+  const tableId = 'svc_' + serviceId;
+  const svcEl = document.getElementById(tableId);
+  if (!svcEl) return;
+  const rows = svcEl.querySelectorAll('tbody tr');
+  const detailsRowIndex = (rowIndex * 2) + 1; // Second row for each item
+  if (rows[detailsRowIndex]) {
+    const discInput = rows[detailsRowIndex].querySelector('input[type="number"]');
+    if (discInput) discInput.value = item.discount.toFixed(0);
+  }
+}
+
+// Update discountPerUnit when user manually changes total discount
+function updateDiscountPerUnitFromTotal(serviceId, rowIndex) {
+  const item = serviceItemsData[serviceId][rowIndex];
+  if (!item) return;
+  const discount = parseFloat(item.discount) || 0;
+  const qty = parseFloat(item.qty) || 1;
+  item.discountPerUnit = qty > 0 ? discount / qty : 0;
 }
 
 function changeQty(serviceId, rowIndex, delta) {
@@ -2242,15 +2309,33 @@ function getAutoName(serviceId, pricingType) {
 function addItemRow(serviceId, serviceName, pricingType) {
   const autoName = getAutoName(serviceId, pricingType);
   const autoPrice = getDefaultPrice(serviceId);
-  const autoDiscount = getDefaultDiscount(serviceId);
-  serviceItemsData[serviceId].push({ name:autoName, qty:1, price:autoPrice, subtotal:0, discount:autoDiscount, details:'' });
+  const discountPerUnit = getDefaultDiscount(serviceId);
+  serviceItemsData[serviceId].push({ 
+    name: autoName, 
+    qty: 1, 
+    price: autoPrice, 
+    discountPerUnit: discountPerUnit,
+    discount: discountPerUnit, // For qty=1, total equals per-unit
+    subtotal: 0, 
+    details: '',
+    isCustom: false
+  });
   renderServiceItems(serviceId, serviceName, pricingType, serviceItemsData[serviceId]);
   updatePaymentSummary();
 }
 
 function removeItemRow(serviceId, rowIndex) {
   serviceItemsData[serviceId].splice(rowIndex, 1);
-  if (serviceItemsData[serviceId].length === 0) serviceItemsData[serviceId].push({ name:'', qty:1, price:'', subtotal:0, discount:0, details:'' });
+  if (serviceItemsData[serviceId].length === 0) serviceItemsData[serviceId].push({ 
+    name: '', 
+    qty: 1, 
+    price: '', 
+    discountPerUnit: 0,
+    discount: 0, 
+    subtotal: 0, 
+    details: '',
+    isCustom: false
+  });
   const services = DB.get('services') || [];
   const svc = services.find(s => s.id === serviceId);
   renderServiceItems(serviceId, svc?svc.name:'', svc?svc.pricingType:'per_item', serviceItemsData[serviceId]);
@@ -2506,16 +2591,22 @@ function saveItemsToServices(serviceItemsData) {
     if (!svc.items) svc.items = [];
     items.forEach(item => {
       if (!item.name || !item.price) return;
+      
+      // Calculate discount per unit if not already set
+      const discountPerUnit = item.discountPerUnit !== undefined 
+        ? parseFloat(item.discountPerUnit) || 0
+        : (parseFloat(item.discount) || 0) / (parseFloat(item.qty) || 1);
+      
       const existing = svc.items.find(i => i.name.toLowerCase() === item.name.toLowerCase());
       if (existing) { 
         existing.price = item.price;
-        existing.discount = parseFloat(item.discount) || 0;
+        existing.discount = discountPerUnit; // Save per-unit discount in settings
       }
       else { 
         svc.items.push({ 
           name: item.name, 
           price: parseFloat(item.price),
-          discount: parseFloat(item.discount) || 0
+          discount: discountPerUnit // Save per-unit discount in settings
         }); 
       }
     });
