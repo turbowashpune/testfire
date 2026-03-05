@@ -1996,25 +1996,26 @@ function renderServiceItems(serviceId, serviceName, pricingType, existingItems) 
           <tr style="background:rgba(255,107,0,0.08);">
             <th style="padding:6px 4px;text-align:left;font-size:10px;color:var(--text2);font-weight:700;">ITEM</th>
             <th style="padding:6px 4px;text-align:center;font-size:10px;color:var(--text2);font-weight:700;width:70px;">${pricingType==='per_kg'?'KG':'QTY'}</th>
+            <th style="padding:6px 4px;text-align:center;font-size:10px;color:var(--text2);font-weight:700;width:65px;">PRICE</th>
             <th style="padding:6px 4px;text-align:right;font-size:10px;color:var(--orange);font-weight:700;width:60px;">SUB</th>
-            <th style="width:30px;"></th>
           </tr>
         </thead>
         <tbody>
           ${items.map((item,i) => `
             <tr style="border-bottom:1px solid rgba(0,0,0,0.05);">
             <td style="padding:5px 4px;">
-              <input list="items_${serviceId}_${i}" type="text" value="${item.name||''}"
-                onfocus="this.setAttribute('data-orig', this.value); this.value = '';"
-                onclick="this.setAttribute('data-orig', this.value); this.value = '';"
-                onblur="if(!this.value && this.getAttribute('data-orig')) this.value = this.getAttribute('data-orig');"
-                onchange="updateItemField('${serviceId}',${i},'name',this.value);autoFillPriceOnChange('${serviceId}',${i},'${serviceName}')"
-                oninput="updateItemField('${serviceId}',${i},'name',this.value)"
-                placeholder="${getServicePlaceholder(serviceId)}"
-                style="width:100%;border:1px solid var(--border);border-radius:5px;padding:5px 6px;font-size:12px;font-family:'Poppins',sans-serif;outline:none;box-sizing:border-box;">
-              <datalist id="items_${serviceId}_${i}">
-                ${savedItems.map(si=>`<option value="${si.name}">`).join('')}
-              </datalist>
+              <select onchange="handleItemSelect('${serviceId}',${i},this.value,'${serviceName}')"
+                style="width:100%;border:1px solid var(--border);border-radius:5px;padding:5px 6px;font-size:12px;font-family:'Poppins',sans-serif;outline:none;box-sizing:border-box;background:white;">
+                <option value="">Select item...</option>
+                ${savedItems.map(si=>`<option value="${si.name}" ${item.name===si.name?'selected':''}>${si.name}</option>`).join('')}
+                <option value="__custom__" ${!savedItems.find(si=>si.name===item.name) && item.name?'selected':''}>✏️ Custom: ${item.name || 'Type new...'}</option>
+              </select>
+              ${!savedItems.find(si=>si.name===item.name) && item.name ? `
+                <input type="text" value="${item.name||''}"
+                  onchange="updateItemField('${serviceId}',${i},'name',this.value);reRenderService('${serviceId}','${serviceName}','${pricingType}')"
+                  placeholder="Enter item name..."
+                  style="width:100%;border:1px solid var(--orange);border-radius:5px;padding:5px 6px;font-size:11px;margin-top:4px;box-sizing:border-box;">
+              ` : ''}
             </td>
             <td style="padding:5px 4px;">
               ${pricingType==='per_kg' ? `
@@ -2034,33 +2035,32 @@ function renderServiceItems(serviceId, serviceName, pricingType, existingItems) 
                 </div>
               `}
             </td>
+            <td style="padding:5px 4px;">
+              <input type="number" min="0" step="0.5" value="${item.price||''}"
+                onchange="updateItemField('${serviceId}',${i},'price',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                oninput="updateItemField('${serviceId}',${i},'price',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                placeholder="0"
+                style="width:100%;border:1px solid var(--border);border-radius:5px;padding:4px 6px;font-size:12px;text-align:center;">
+            </td>
             <td style="padding:5px 4px;text-align:right;font-weight:800;font-size:13px;color:var(--orange);white-space:nowrap;">₹${calcSub(item).toFixed(0)}</td>
-            <td style="padding:5px 2px;"><button onclick="removeItemRow('${serviceId}',${i})" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:14px;padding:2px;">🗑</button></td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
             <td colspan="4" style="padding:5px 4px;">
-              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-                <div style="display:flex;align-items:center;gap:4px;">
-                  <span style="font-size:10px;color:var(--text3);font-weight:600;">PRICE</span>
-                  <input type="number" min="0" step="0.5" value="${item.price||''}"
-                    onchange="updateItemField('${serviceId}',${i},'price',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
-                    oninput="updateItemField('${serviceId}',${i},'price',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
-                    placeholder="0"
-                    style="width:60px;border:1px solid var(--border);border-radius:5px;padding:4px 6px;font-size:12px;text-align:center;">
-                </div>
-                <div style="display:flex;align-items:center;gap:4px;">
-                  <span style="font-size:10px;color:#0277BD;font-weight:600;">DISC</span>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <div style="display:flex;flex-direction:column;gap:2px;">
+                  <span style="font-size:9px;color:#0277BD;font-weight:600;text-transform:uppercase;">Disc</span>
                   <input type="number" min="0" step="1" value="${item.discount||0}"
                     onchange="updateItemField('${serviceId}',${i},'discount',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                     oninput="updateItemField('${serviceId}',${i},'discount',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                     placeholder="0"
-                    style="width:60px;border:1px solid #29B6F6;border-radius:5px;padding:4px 6px;font-size:12px;text-align:center;color:#0277BD;">
+                    style="width:55px;border:1px solid #29B6F6;border-radius:5px;padding:4px 6px;font-size:12px;text-align:center;color:#0277BD;">
                 </div>
                 <input type="text" value="${item.details||''}"
                   onchange="updateItemField('${serviceId}',${i},'details',this.value)"
                   oninput="updateItemField('${serviceId}',${i},'details',this.value)"
-                  placeholder="Details..."
-                  style="flex:1;min-width:120px;border:1px solid rgba(0,0,0,0.1);border-radius:5px;padding:4px 8px;font-size:11px;color:var(--text2);font-style:italic;background:rgba(0,0,0,0.02);">
+                  placeholder="Details (color, brand, special instructions...)"
+                  style="flex:1;min-width:150px;border:1px solid rgba(0,0,0,0.1);border-radius:5px;padding:6px 8px;font-size:11px;color:var(--text2);font-style:italic;background:rgba(0,0,0,0.02);">
+                <button onclick="removeItemRow('${serviceId}',${i})" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:16px;padding:4px 6px;">🗑</button>
               </div>
             </td>
           </tr>
@@ -2152,6 +2152,36 @@ function autoFillPriceOnChange(serviceId, rowIndex, serviceName) {
     serviceItemsData[serviceId][rowIndex].discount = match.discount || 0; // Auto-fill discount too!
     reRenderService(serviceId, serviceName, svc.pricingType);
   }
+}
+
+function handleItemSelect(serviceId, rowIndex, value, serviceName) {
+  const services = DB.get('services') || [];
+  const svc = services.find(s => s.id === serviceId);
+  
+  if (value === '__custom__') {
+    // User wants to enter custom item - keep current name and re-render to show text input
+    reRenderService(serviceId, serviceName, svc ? svc.pricingType : 'per_item');
+    return;
+  }
+  
+  if (!value) {
+    // Cleared selection
+    serviceItemsData[serviceId][rowIndex].name = '';
+    serviceItemsData[serviceId][rowIndex].price = '';
+    serviceItemsData[serviceId][rowIndex].discount = 0;
+    reRenderService(serviceId, serviceName, svc ? svc.pricingType : 'per_item');
+    return;
+  }
+  
+  // Selected an item from the list - auto-fill price and discount
+  serviceItemsData[serviceId][rowIndex].name = value;
+  const match = svc && svc.items ? svc.items.find(i => i.name === value) : null;
+  if (match) {
+    serviceItemsData[serviceId][rowIndex].price = match.price;
+    serviceItemsData[serviceId][rowIndex].discount = match.discount || 0;
+  }
+  reRenderService(serviceId, serviceName, svc ? svc.pricingType : 'per_item');
+  updatePaymentSummary();
 }
 
 function changeQty(serviceId, rowIndex, delta) {
@@ -2260,7 +2290,7 @@ function updateSubDisplay(serviceId, rowIndex) {
   const actualRowIndex = rowIndex * 2; // Each item takes 2 rows
   if (rows[actualRowIndex]) {
     const cells = rows[actualRowIndex].querySelectorAll('td');
-    if (cells[2]) cells[2].textContent = '₹' + sub.toFixed(0); // SUB is now column 2
+    if (cells[3]) cells[3].textContent = '₹' + sub.toFixed(0); // SUB is now column 3 (ITEM, QTY, PRICE, SUB)
   }
 }
 
