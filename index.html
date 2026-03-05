@@ -1952,7 +1952,8 @@ function toggleService(id, name, pricingType, el) {
     if (!serviceItemsData[id]) {
       const autoName = getAutoName(id, pricingType);
       const autoPrice = getDefaultPrice(id);
-      serviceItemsData[id] = [{ name:autoName, qty:1, price:autoPrice, subtotal:0, discount:0, details:'' }];
+      const autoDiscount = getDefaultDiscount(id);
+      serviceItemsData[id] = [{ name:autoName, qty:1, price:autoPrice, subtotal:0, discount:autoDiscount, details:'' }];
     }
     renderServiceItems(id, name, pricingType, serviceItemsData[id]);
   } else {
@@ -1990,32 +1991,30 @@ function renderServiceItems(serviceId, serviceName, pricingType, existingItems) 
         <span style="font-size:11px;color:var(--text2);">${pricingType==='per_kg'?'Per KG':'Per Item'}</span>
       </div>
       <div style="overflow-x:auto;">
-      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:340px;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
         <thead>
           <tr style="background:rgba(255,107,0,0.08);">
-            <th style="padding:6px 4px;text-align:left;font-size:10px;color:var(--text2);font-weight:700;min-width:90px;">ITEM</th>
-            <th style="padding:6px 4px;text-align:center;font-size:10px;color:var(--text2);font-weight:700;width:80px;">${pricingType==='per_kg'?'KG':'QTY'}</th>
-            <th style="padding:6px 4px;text-align:center;font-size:10px;color:var(--text2);font-weight:700;width:65px;">PRICE</th>
-            <th style="padding:6px 4px;text-align:center;font-size:10px;color:var(--text2);font-weight:700;width:55px;">DISC(₹)</th>
-            <th style="padding:6px 4px;text-align:right;font-size:10px;color:var(--orange);font-weight:700;width:50px;">SUB</th>
-            <th style="width:24px;"></th>
+            <th style="padding:6px 4px;text-align:left;font-size:10px;color:var(--text2);font-weight:700;">ITEM</th>
+            <th style="padding:6px 4px;text-align:center;font-size:10px;color:var(--text2);font-weight:700;width:70px;">${pricingType==='per_kg'?'KG':'QTY'}</th>
+            <th style="padding:6px 4px;text-align:right;font-size:10px;color:var(--orange);font-weight:700;width:60px;">SUB</th>
+            <th style="width:30px;"></th>
           </tr>
         </thead>
         <tbody>
           ${items.map((item,i) => `
-            <tr style="border-bottom:1px solid var(--border);">
+            <tr style="border-bottom:1px solid rgba(0,0,0,0.05);">
             <td style="padding:5px 4px;">
-              <div style="position:relative;">
-                <input list="items_${serviceId}_${i}" type="text" value="${item.name||''}"
-                  onchange="updateItemField('${serviceId}',${i},'name',this.value);autoFillPriceOnChange('${serviceId}',${i},'${serviceName}')"
-                  oninput="updateItemField('${serviceId}',${i},'name',this.value)"
-                  placeholder="${getServicePlaceholder(serviceId)}"
-                  style="width:100%;min-width:85px;border:1px solid var(--border);border-radius:5px;padding:5px 20px 5px 6px;font-size:12px;font-family:'Poppins',sans-serif;outline:none;box-sizing:border-box;">
-                <span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text3);font-size:10px;">▼</span>
-                <datalist id="items_${serviceId}_${i}">
-                  ${savedItems.map(si=>`<option value="${si.name}">`).join('')}
-                </datalist>
-              </div>
+              <input list="items_${serviceId}_${i}" type="text" value="${item.name||''}"
+                onfocus="this.setAttribute('data-orig', this.value); this.value = '';"
+                onclick="this.setAttribute('data-orig', this.value); this.value = '';"
+                onblur="if(!this.value && this.getAttribute('data-orig')) this.value = this.getAttribute('data-orig');"
+                onchange="updateItemField('${serviceId}',${i},'name',this.value);autoFillPriceOnChange('${serviceId}',${i},'${serviceName}')"
+                oninput="updateItemField('${serviceId}',${i},'name',this.value)"
+                placeholder="${getServicePlaceholder(serviceId)}"
+                style="width:100%;border:1px solid var(--border);border-radius:5px;padding:5px 6px;font-size:12px;font-family:'Poppins',sans-serif;outline:none;box-sizing:border-box;">
+              <datalist id="items_${serviceId}_${i}">
+                ${savedItems.map(si=>`<option value="${si.name}">`).join('')}
+              </datalist>
             </td>
             <td style="padding:5px 4px;">
               ${pricingType==='per_kg' ? `
@@ -2023,7 +2022,7 @@ function renderServiceItems(serviceId, serviceName, pricingType, existingItems) 
                   onchange="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||0.1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                   oninput="updateItemField('${serviceId}',${i},'qty',parseFloat(this.value)||0.1);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
                   placeholder="KG"
-                  style="width:52px;text-align:center;border:1.5px solid var(--orange);border-radius:6px;padding:5px 4px;font-size:13px;font-weight:700;color:var(--orange);">
+                  style="width:50px;text-align:center;border:1.5px solid var(--orange);border-radius:6px;padding:5px 4px;font-size:13px;font-weight:700;color:var(--orange);">
               ` : `
                 <div style="display:flex;align-items:center;gap:1px;justify-content:center;">
                   <button onclick="changeQty('${serviceId}',${i},-1)" style="width:20px;height:20px;border-radius:4px;border:1px solid var(--border);background:white;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;">−</button>
@@ -2035,30 +2034,34 @@ function renderServiceItems(serviceId, serviceName, pricingType, existingItems) 
                 </div>
               `}
             </td>
-            <td style="padding:5px 4px;">
-              <input type="number" min="0" step="0.5" value="${item.price||''}"
-                onchange="updateItemField('${serviceId}',${i},'price',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
-                oninput="updateItemField('${serviceId}',${i},'price',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
-                placeholder="0"
-                style="width:100%;border:1px solid var(--border);border-radius:5px;padding:5px 4px;font-size:12px;text-align:center;">
-            </td>
-            <td style="padding:5px 4px;">
-              <input type="number" min="0" step="1" value="${item.discount||0}"
-                onchange="updateItemField('${serviceId}',${i},'discount',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
-                oninput="updateItemField('${serviceId}',${i},'discount',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
-                placeholder="0"
-                style="width:100%;border:1px solid #29B6F6;border-radius:5px;padding:5px 4px;font-size:12px;text-align:center;color:#0277BD;">
-            </td>
             <td style="padding:5px 4px;text-align:right;font-weight:800;font-size:13px;color:var(--orange);white-space:nowrap;">₹${calcSub(item).toFixed(0)}</td>
             <td style="padding:5px 2px;"><button onclick="removeItemRow('${serviceId}',${i})" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:14px;padding:2px;">🗑</button></td>
           </tr>
           <tr style="border-bottom:1px solid var(--border);">
-            <td colspan="6" style="padding:5px 4px;">
-              <input type="text" value="${item.details||''}"
-                onchange="updateItemField('${serviceId}',${i},'details',this.value)"
-                oninput="updateItemField('${serviceId}',${i},'details',this.value)"
-                placeholder="Details (e.g., shoe brand, color, special instructions...)"
-                style="width:100%;border:1px solid rgba(0,0,0,0.1);border-radius:5px;padding:5px 8px;font-size:11px;color:var(--text2);font-style:italic;background:rgba(0,0,0,0.02);">
+            <td colspan="4" style="padding:5px 4px;">
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <span style="font-size:10px;color:var(--text3);font-weight:600;">PRICE</span>
+                  <input type="number" min="0" step="0.5" value="${item.price||''}"
+                    onchange="updateItemField('${serviceId}',${i},'price',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                    oninput="updateItemField('${serviceId}',${i},'price',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                    placeholder="0"
+                    style="width:60px;border:1px solid var(--border);border-radius:5px;padding:4px 6px;font-size:12px;text-align:center;">
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <span style="font-size:10px;color:#0277BD;font-weight:600;">DISC</span>
+                  <input type="number" min="0" step="1" value="${item.discount||0}"
+                    onchange="updateItemField('${serviceId}',${i},'discount',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                    oninput="updateItemField('${serviceId}',${i},'discount',parseFloat(this.value)||0);updateSubDisplay('${serviceId}',${i});updatePaymentSummary()"
+                    placeholder="0"
+                    style="width:60px;border:1px solid #29B6F6;border-radius:5px;padding:4px 6px;font-size:12px;text-align:center;color:#0277BD;">
+                </div>
+                <input type="text" value="${item.details||''}"
+                  onchange="updateItemField('${serviceId}',${i},'details',this.value)"
+                  oninput="updateItemField('${serviceId}',${i},'details',this.value)"
+                  placeholder="Details..."
+                  style="flex:1;min-width:120px;border:1px solid rgba(0,0,0,0.1);border-radius:5px;padding:4px 8px;font-size:11px;color:var(--text2);font-style:italic;background:rgba(0,0,0,0.02);">
+              </div>
             </td>
           </tr>
           `).join('')}
@@ -2146,6 +2149,7 @@ function autoFillPriceOnChange(serviceId, rowIndex, serviceName) {
   const match = svc.items.find(i => i.name.toLowerCase() === itemName.toLowerCase());
   if (match) {
     serviceItemsData[serviceId][rowIndex].price = match.price;
+    serviceItemsData[serviceId][rowIndex].discount = match.discount || 0; // Auto-fill discount too!
     reRenderService(serviceId, serviceName, svc.pricingType);
   }
 }
@@ -2181,6 +2185,13 @@ function getDefaultPrice(serviceId) {
   return svc.items[0].price || '';
 }
 
+function getDefaultDiscount(serviceId) {
+  const services = DB.get('services') || [];
+  const svc = services.find(s => s.id === serviceId);
+  if (!svc || !svc.items || svc.items.length === 0) return 0;
+  return svc.items[0].discount || 0;
+}
+
 function getDefaultItemName(serviceId) {
   const services = DB.get('services') || [];
   const svc = services.find(s => s.id === serviceId);
@@ -2201,7 +2212,8 @@ function getAutoName(serviceId, pricingType) {
 function addItemRow(serviceId, serviceName, pricingType) {
   const autoName = getAutoName(serviceId, pricingType);
   const autoPrice = getDefaultPrice(serviceId);
-  serviceItemsData[serviceId].push({ name:autoName, qty:1, price:autoPrice, subtotal:0, discount:0, details:'' });
+  const autoDiscount = getDefaultDiscount(serviceId);
+  serviceItemsData[serviceId].push({ name:autoName, qty:1, price:autoPrice, subtotal:0, discount:autoDiscount, details:'' });
   renderServiceItems(serviceId, serviceName, pricingType, serviceItemsData[serviceId]);
   updatePaymentSummary();
 }
@@ -2248,7 +2260,7 @@ function updateSubDisplay(serviceId, rowIndex) {
   const actualRowIndex = rowIndex * 2; // Each item takes 2 rows
   if (rows[actualRowIndex]) {
     const cells = rows[actualRowIndex].querySelectorAll('td');
-    if (cells[4]) cells[4].textContent = '₹' + sub.toFixed(0);
+    if (cells[2]) cells[2].textContent = '₹' + sub.toFixed(0); // SUB is now column 2
   }
 }
 
