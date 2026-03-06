@@ -631,9 +631,27 @@ input[type="number"] {
             <div class="stat-lbl">Unpaid Orders</div>
           </div>
         </div>
-        <!-- Future: Revenue section will go here -->
-        <div style="padding:16px;text-align:center;color:var(--text3);font-size:12px;font-style:italic;">
-          Revenue section coming soon...
+        
+        <!-- REVENUE SECTION (Admin Only) -->
+        <div id="revenueSection" style="display:none;">
+          <div class="section-header" style="margin-top:16px;">
+            <h3>💰 Revenue</h3>
+          </div>
+          
+          <!-- Revenue Tabs -->
+          <div style="padding:0 16px;">
+            <div class="revenue-tabs" style="display:flex;gap:8px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;">
+              <button class="revenue-tab" onclick="switchRevenueTab('year',this)" style="padding:8px 16px;border-radius:8px;border:2px solid var(--border);background:white;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;color:var(--text2);">Year</button>
+              <button class="revenue-tab active" onclick="switchRevenueTab('month',this)" style="padding:8px 16px;border-radius:8px;border:2px solid var(--orange);background:var(--orange);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;color:white;">Month</button>
+              <button class="revenue-tab" onclick="switchRevenueTab('week',this)" style="padding:8px 16px;border-radius:8px;border:2px solid var(--border);background:white;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;color:var(--text2);">Week</button>
+              <button class="revenue-tab" onclick="switchRevenueTab('daily',this)" style="padding:8px 16px;border-radius:8px;border:2px solid var(--border);background:white;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;color:var(--text2);">Daily</button>
+            </div>
+            
+            <!-- Chart Container -->
+            <div id="revenueChartContainer" style="background:white;border-radius:12px;padding:16px;box-shadow:var(--shadow2);overflow-x:auto;min-height:250px;">
+              <div class="loading" style="padding:40px;"><div class="spinner"></div></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1584,6 +1602,13 @@ function refreshDashboard() {
     document.getElementById('statUnpaid').textContent = unpaid.length;
     document.getElementById('statRevenueCard').style.display = '';
     document.getElementById('statUnpaidCard').style.display = '';
+    
+    // Show and render Revenue section
+    document.getElementById('revenueSection').style.display = 'block';
+    renderRevenueChart('month'); // Default to month view
+  } else {
+    // Hide Revenue section for non-admin
+    document.getElementById('revenueSection').style.display = 'none';
   }
 
   // Overdue banner
@@ -1612,6 +1637,195 @@ function refreshDashboard() {
   // } else {
   //   container.innerHTML = recent.map(o => renderOrderCard(o)).join('');
   // }
+}
+
+// ============================================================
+// REVENUE SECTION
+// ============================================================
+
+let currentRevenueTab = 'month';
+
+function switchRevenueTab(tab, el) {
+  currentRevenueTab = tab;
+  
+  // Update tab styling
+  document.querySelectorAll('.revenue-tab').forEach(t => {
+    t.style.border = '2px solid var(--border)';
+    t.style.background = 'white';
+    t.style.color = 'var(--text2)';
+  });
+  el.style.border = '2px solid var(--orange)';
+  el.style.background = 'var(--orange)';
+  el.style.color = 'white';
+  
+  // Render chart
+  renderRevenueChart(tab);
+}
+
+function renderRevenueChart(period) {
+  const orders = DB.get('orders') || [];
+  
+  // Filter only paid orders (paid_delivered status)
+  const paidOrders = orders.filter(o => o.status === 'paid_delivered');
+  
+  let chartData = [];
+  
+  if (period === 'year') {
+    chartData = getYearlyRevenue(paidOrders);
+  } else if (period === 'month') {
+    chartData = getMonthlyRevenue(paidOrders);
+  } else if (period === 'week') {
+    chartData = getWeeklyRevenue(paidOrders);
+  } else if (period === 'daily') {
+    chartData = getDailyRevenue(paidOrders);
+  }
+  
+  // Render bar chart
+  renderBarChart(chartData);
+}
+
+function getYearlyRevenue(paidOrders) {
+  const currentYear = new Date().getFullYear();
+  const data = [];
+  
+  // Show last 3 years + current year (or just current if no data)
+  for (let year = currentYear - 3; year <= currentYear; year++) {
+    const yearOrders = paidOrders.filter(o => {
+      const orderYear = new Date(o.createdAt).getFullYear();
+      return orderYear === year;
+    });
+    
+    const revenue = yearOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    data.push({ label: year.toString(), value: revenue });
+  }
+  
+  return data;
+}
+
+function getMonthlyRevenue(paidOrders) {
+  const currentYear = new Date().getFullYear();
+  const data = [];
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  // Show all 12 months of current year
+  for (let month = 0; month < 12; month++) {
+    const monthOrders = paidOrders.filter(o => {
+      const orderDate = new Date(o.createdAt);
+      return orderDate.getFullYear() === currentYear && orderDate.getMonth() === month;
+    });
+    
+    const revenue = monthOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    data.push({ label: monthNames[month], value: revenue });
+  }
+  
+  return data;
+}
+
+function getWeeklyRevenue(paidOrders) {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const data = [];
+  
+  // Get first and last day of current month
+  const firstDay = new Date(currentYear, currentMonth, 1);
+  const lastDay = new Date(currentYear, currentMonth + 1, 0);
+  
+  // Calculate weeks in current month (max 5 weeks)
+  for (let week = 1; week <= 5; week++) {
+    const weekStart = new Date(firstDay);
+    weekStart.setDate(1 + (week - 1) * 7);
+    
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    
+    // Stop if week starts after month ends
+    if (weekStart > lastDay) break;
+    
+    // Adjust weekEnd to not exceed month
+    if (weekEnd > lastDay) weekEnd.setTime(lastDay.getTime());
+    
+    const weekOrders = paidOrders.filter(o => {
+      const orderDate = new Date(o.createdAt);
+      return orderDate >= weekStart && orderDate <= weekEnd;
+    });
+    
+    const revenue = weekOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    data.push({ label: `Week ${week}`, value: revenue });
+  }
+  
+  return data;
+}
+
+function getDailyRevenue(paidOrders) {
+  const data = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Show last 30 days
+  for (let i = 29; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    
+    const dateStr = date.toISOString().split('T')[0];
+    const dayLabel = date.getDate() + ' ' + date.toLocaleDateString('en-US', { month: 'short' });
+    
+    const dayOrders = paidOrders.filter(o => {
+      return o.createdAt && o.createdAt.startsWith(dateStr);
+    });
+    
+    const revenue = dayOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    data.push({ label: dayLabel, value: revenue });
+  }
+  
+  return data;
+}
+
+function renderBarChart(data) {
+  const container = document.getElementById('revenueChartContainer');
+  
+  if (!data || data.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3);">No revenue data available</div>';
+    return;
+  }
+  
+  // Find max value for scaling
+  const maxValue = Math.max(...data.map(d => d.value), 1);
+  
+  // Calculate total revenue
+  const totalRevenue = data.reduce((sum, d) => sum + d.value, 0);
+  
+  // Render chart
+  let html = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid var(--border);">
+      <div>
+        <div style="font-size:12px;color:var(--text3);font-weight:600;text-transform:uppercase;">Total Revenue</div>
+        <div style="font-size:24px;font-weight:700;color:var(--orange);margin-top:4px;">₹${totalRevenue.toFixed(0)}</div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);">${data.length} ${currentRevenueTab === 'year' ? 'years' : currentRevenueTab === 'month' ? 'months' : currentRevenueTab === 'week' ? 'weeks' : 'days'}</div>
+    </div>
+    
+    <div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;">
+  `;
+  
+  data.forEach(item => {
+    const barHeight = maxValue > 0 ? (item.value / maxValue) * 150 : 0;
+    const barColor = item.value > 0 ? 'var(--orange)' : '#e0e0e0';
+    
+    html += `
+      <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:${currentRevenueTab === 'daily' ? '50px' : '60px'};">
+        <div style="font-size:11px;font-weight:700;color:var(--orange);min-height:20px;">${item.value > 0 ? '₹' + item.value.toFixed(0) : ''}</div>
+        <div style="width:100%;height:150px;display:flex;align-items:flex-end;justify-content:center;">
+          <div style="width:${currentRevenueTab === 'daily' ? '30px' : '40px'};height:${barHeight}px;background:${barColor};border-radius:6px 6px 0 0;transition:all 0.3s;"></div>
+        </div>
+        <div style="font-size:10px;font-weight:600;color:var(--text2);text-align:center;line-height:1.2;">${item.label}</div>
+      </div>
+    `;
+  });
+  
+  html += '</div>';
+  
+  container.innerHTML = html;
 }
 
 // ============================================================
