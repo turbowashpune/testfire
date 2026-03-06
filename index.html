@@ -198,6 +198,31 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
 .order-customer { font-weight:600; font-size:14px; color:var(--text); }
 .order-phone { font-size:12px; color:var(--text2); }
 .order-services { display:flex; flex-wrap:wrap; gap:4px; margin:6px 0; }
+
+/* ===== DUE DATE NEW - HORIZONTAL SCROLL ===== */
+#dueDateNewContainer {
+  /* Webkit (Safari/Chrome) */
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+#dueDateNewContainer::-webkit-scrollbar {
+  height: 6px;
+}
+#dueDateNewContainer::-webkit-scrollbar-track {
+  background: var(--bg);
+  border-radius: 3px;
+}
+#dueDateNewContainer::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+#dueDateNewContainer::-webkit-scrollbar-thumb:hover {
+  background: var(--text3);
+}
+.date-column {
+  scroll-snap-align: start;
+}
+
 .service-tag { background:var(--card2); border:1px solid var(--border); border-radius:6px; padding:2px 8px; font-size:10px; color:var(--text2); font-weight:600; }
 .order-card-bottom { display:flex; align-items:center; justify-content:space-between; padding-top:8px; border-top:1px solid var(--border); }
 .order-amount { font-family:'Nunito',sans-serif; font-weight:800; font-size:15px; color:var(--text); }
@@ -618,22 +643,50 @@ input[type="number"] {
     <!-- ORDERS PAGE -->
     <div class="page" id="pageOrders">
       <div class="page-content">
+        <!-- Main Tabs: Active, Completed, Archive -->
+        <div class="main-tabs" style="display:flex;border-bottom:2px solid var(--border);background:var(--card);margin-bottom:12px;">
+          <div class="main-tab active" onclick="switchOrderTab('active',this)" style="flex:1;text-align:center;padding:12px;font-weight:700;font-size:13px;cursor:pointer;border-bottom:3px solid var(--orange);color:var(--orange);">
+            Active <span id="activeCount" style="background:var(--orange);color:white;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;">0</span>
+          </div>
+          <div class="main-tab" onclick="switchOrderTab('completed',this)" style="flex:1;text-align:center;padding:12px;font-weight:700;font-size:13px;cursor:pointer;border-bottom:3px solid transparent;color:var(--text2);">
+            Completed <span id="completedCount" style="background:var(--text3);color:white;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;">0</span>
+          </div>
+          <div class="main-tab" onclick="switchOrderTab('archive',this)" style="flex:1;text-align:center;padding:12px;font-weight:700;font-size:13px;cursor:pointer;border-bottom:3px solid transparent;color:var(--text2);">
+            Archive <span id="archiveCount" style="background:var(--text3);color:white;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;">0</span>
+          </div>
+        </div>
+
+        <!-- Search Bar -->
         <div class="search-bar">
           <div class="search-input-wrap">
             <span class="search-icon">🔍</span>
             <input type="text" placeholder="Search by name, phone or order no..." id="orderSearch" oninput="filterOrders()">
           </div>
         </div>
+
+        <!-- Sub-filters (Dynamic based on active tab) -->
         <div class="filter-tabs" id="orderFilterTabs">
+          <!-- Active tab filters -->
           <div class="filter-tab active" onclick="setOrderFilter('all',this)">All</div>
           <div class="filter-tab" onclick="setOrderFilter('received',this)">Received</div>
-          <div class="filter-tab" onclick="setOrderFilter('inprogress',this)">In Progress</div>
+          <div class="filter-tab" onclick="setOrderFilter('inprogress',this)">In-Progress</div>
           <div class="filter-tab" onclick="setOrderFilter('ready',this)">Ready</div>
-          <div class="filter-tab" onclick="setOrderFilter('delivered',this)">Delivered</div>
-          <div class="filter-tab" onclick="setOrderFilter('cancelled',this)">Cancelled</div>
+          <div class="filter-tab" onclick="setOrderFilter('unpaid_delivered',this)">Unpaid</div>
         </div>
+
+        <!-- Orders List -->
         <div id="ordersList" style="padding:0 16px; display:flex; flex-direction:column; gap:8px; padding-bottom:20px;">
           <div class="loading"><div class="spinner"></div></div>
+        </div>
+
+        <!-- Load More Button (Archive tab only) -->
+        <div id="loadMoreContainer" style="display:none;padding:16px;text-align:center;">
+          <button onclick="loadMoreArchive()" class="btn btn-secondary btn-full" id="loadMoreBtn">
+            Load More (15 orders)
+          </button>
+          <div style="font-size:11px;color:var(--text3);margin-top:8px;" id="archiveInfo">
+            Showing 1-15 of 243 orders
+          </div>
         </div>
       </div>
     </div>
@@ -642,6 +695,24 @@ input[type="number"] {
     <div class="page" id="pageDueDate">
       <div class="page-content" id="dueDateContent">
         <div class="loading" style="padding:40px;"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- DUE DATE NEW PAGE (Kanban Style) -->
+    <div class="page" id="pageDueDateNew">
+      <div class="page-content" style="padding:0;">
+        <!-- Today Button - Fixed at top -->
+        <div style="position:sticky;top:0;z-index:10;background:var(--card);padding:12px 16px;border-bottom:2px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+          <h3 style="margin:0;font-size:16px;font-weight:700;">Due Dates Calendar</h3>
+          <button onclick="scrollToToday()" style="padding:8px 16px;background:var(--orange);color:white;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+            <span>📍</span> Today
+          </button>
+        </div>
+        
+        <!-- Horizontal Scroll Container -->
+        <div id="dueDateNewContainer" style="display:flex;overflow-x:auto;padding:16px 8px;gap:12px;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;">
+          <div class="loading" style="padding:40px;width:100%;"><div class="spinner"></div></div>
+        </div>
       </div>
     </div>
 
@@ -663,6 +734,15 @@ input[type="number"] {
     <!-- MORE PAGE (Reports, Settings, Backup) -->
     <div class="page" id="pageMore">
       <div class="page-content" style="padding-top:12px;">
+        <!-- Quick Access -->
+        <div class="settings-group">
+          <div class="settings-group-title">⚡ Quick Access</div>
+          <div class="settings-item" onclick="switchPage('pageDueDateNew')">
+            <span class="s-icon">📅</span>
+            <div class="s-info"><div class="s-title">Due Date Calendar</div><div class="s-sub">View orders by date (Kanban style)</div></div>
+            <span class="s-arrow">›</span>
+          </div>
+        </div>
         <!-- Admin sections -->
         <div id="adminMoreSection">
           <div class="settings-group">
@@ -1230,6 +1310,9 @@ function getLogo() {
 // ============================================================
 let currentUser = null;
 let currentOrderFilter = 'all';
+let currentOrderTab = 'active'; // active, completed, archive
+let archiveOffset = 0; // For pagination in archive
+let archiveLimit = 15; // Load 15 at a time
 let editingOrderId = null;
 let currentInvoiceOrderId = null;
 let dueDateRefreshInterval = null;
@@ -1472,6 +1555,7 @@ function switchPage(pageId) {
   if (pageId === 'pageDashboard') refreshDashboard();
   if (pageId === 'pageOrders') renderOrders();
   if (pageId === 'pageDueDate') renderDueDatePage();
+  if (pageId === 'pageDueDateNew') renderDueDateNew();
   if (pageId === 'pageCustomers') renderCustomers();
 }
 
@@ -1561,6 +1645,29 @@ function checkIfNeedsNotification(order) {
   return true;
 }
 
+function dismissStatusNotification(orderId) {
+  const orders = DB.get('orders') || [];
+  const order = orders.find(o => o.id === orderId);
+  if (!order) return;
+  
+  // Mark notification as sent for current status (dismissing it)
+  if (!order.notificationsSent) order.notificationsSent = [];
+  
+  // Add current status to notificationsSent to dismiss the banner
+  const alreadySent = order.notificationsSent.some(n => n.status === order.status);
+  if (!alreadySent) {
+    order.notificationsSent.push({
+      status: order.status,
+      sentAt: new Date().toISOString(),
+      method: 'dismissed' // Mark as dismissed by user
+    });
+  }
+  
+  DB.set('orders', orders);
+  showToast('Notification dismissed', 'info');
+  renderOrders(); // Refresh to remove the banner
+}
+
 function isOverdue(order) {
   if (!order.dueDate || ['paid_delivered','unpaid_delivered','cancelled'].includes(order.status)) return false;
   const due = new Date(order.dueDate); due.setHours(23,59,59,0);
@@ -1645,12 +1752,16 @@ function renderOrderCard(order) {
         📄 Share Invoice
       </button>
     </div>
-    ${needsNotification ? `<div style="margin-top:8px;padding:8px 10px;background:linear-gradient(135deg,#FFB300,#F57F17);border-radius:8px;display:flex;align-items:center;gap:8px;">
+    ${needsNotification ? `<div style="margin-top:8px;padding:8px 10px;background:linear-gradient(135deg,#FFB300,#F57F17);border-radius:8px;display:flex;align-items:center;gap:8px;position:relative;">
       <span style="font-size:16px;">📢</span>
       <div style="flex:1;color:white;">
         <div style="font-size:11px;font-weight:700;">Status Updated!</div>
         <div style="font-size:10px;opacity:0.9;">Send notification to customer</div>
       </div>
+      <button onclick="event.stopPropagation();dismissStatusNotification('${order.id}')" 
+        style="position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.3);color:white;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;padding:0;line-height:1;">
+        ✕
+      </button>
     </div>` : ''}
   </div>`;
 }
@@ -1659,13 +1770,77 @@ function renderOrderCard(order) {
 // ORDERS PAGE
 // ============================================================
 function renderOrders() {
-  const orders = DB.get('orders') || [];
+  const allOrders = DB.get('orders') || [];
   const search = (document.getElementById('orderSearch')||{}).value || '';
-  let filtered = orders;
-
-  if (currentOrderFilter !== 'all') {
-    filtered = filtered.filter(o => o.status === currentOrderFilter);
+  const now = new Date();
+  
+  // Calculate completed date (30 days ago)
+  const thirtyDaysAgo = new Date(now);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  // Helper: Check if order is completed (paid_delivered or cancelled)
+  const isCompleted = (o) => {
+    return o.status === 'paid_delivered' || o.status === 'cancelled';
+  };
+  
+  // Helper: Get completion date
+  const getCompletedDate = (o) => {
+    if (!isCompleted(o)) return null;
+    // Use updatedAt or createdAt as completion date approximation
+    return new Date(o.updatedAt || o.createdAt);
+  };
+  
+  // Filter by tab
+  let filtered = [];
+  
+  if (currentOrderTab === 'active') {
+    // Active: All orders that are NOT completed
+    filtered = allOrders.filter(o => !isCompleted(o));
+    
+    // Apply sub-filter
+    if (currentOrderFilter !== 'all') {
+      filtered = filtered.filter(o => o.status === currentOrderFilter);
+    }
+  } 
+  else if (currentOrderTab === 'completed') {
+    // Completed: Orders completed in last 30 days
+    filtered = allOrders.filter(o => {
+      if (!isCompleted(o)) return false;
+      const completedDate = getCompletedDate(o);
+      return completedDate && completedDate >= thirtyDaysAgo;
+    });
+    
+    // Apply sub-filter
+    if (currentOrderFilter === 'paid_delivered') {
+      filtered = filtered.filter(o => o.status === 'paid_delivered');
+    } else if (currentOrderFilter === 'cancelled') {
+      filtered = filtered.filter(o => o.status === 'cancelled');
+    }
+  } 
+  else if (currentOrderTab === 'archive') {
+    // Archive: Completed orders older than 30 days
+    filtered = allOrders.filter(o => {
+      if (!isCompleted(o)) return false;
+      const completedDate = getCompletedDate(o);
+      return completedDate && completedDate < thirtyDaysAgo;
+    });
+    
+    // Sort by completion date (newest first)
+    filtered.sort((a,b) => {
+      const dateA = getCompletedDate(a);
+      const dateB = getCompletedDate(b);
+      return dateB - dateA;
+    });
+    
+    // Apply pagination: only show archiveLimit records starting from archiveOffset
+    const totalArchive = filtered.length;
+    filtered = filtered.slice(archiveOffset, archiveOffset + archiveLimit);
+    
+    // Update Load More button
+    updateLoadMoreButton(totalArchive);
   }
+  
+  // Apply search filter
   if (search.trim()) {
     const q = search.toLowerCase();
     filtered = filtered.filter(o =>
@@ -1674,14 +1849,135 @@ function renderOrders() {
       o.orderNo.toLowerCase().includes(q)
     );
   }
-  filtered.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-
+  
+  // Sort (except archive which is already sorted)
+  if (currentOrderTab !== 'archive') {
+    filtered.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+  
+  // Update tab counts
+  updateTabCounts(allOrders, thirtyDaysAgo);
+  
+  // Render orders
   const container = document.getElementById('ordersList');
   if (filtered.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><h3>No orders found</h3><p>Try different filters or create a new order</p></div>';
+    let emptyMessage = 'No orders found';
+    if (currentOrderTab === 'active') emptyMessage = 'No active orders';
+    else if (currentOrderTab === 'completed') emptyMessage = 'No completed orders in last 30 days';
+    else if (currentOrderTab === 'archive') emptyMessage = 'No archived orders';
+    
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><h3>${emptyMessage}</h3><p>Try different filters</p></div>`;
   } else {
     container.innerHTML = filtered.map(o => renderOrderCard(o)).join('');
   }
+}
+
+function updateTabCounts(orders, thirtyDaysAgo) {
+  const isCompleted = (o) => o.status === 'paid_delivered' || o.status === 'cancelled';
+  const getCompletedDate = (o) => {
+    if (!isCompleted(o)) return null;
+    return new Date(o.updatedAt || o.createdAt);
+  };
+  
+  // Active count
+  const activeCount = orders.filter(o => !isCompleted(o)).length;
+  
+  // Completed count (last 30 days)
+  const completedCount = orders.filter(o => {
+    if (!isCompleted(o)) return false;
+    const completedDate = getCompletedDate(o);
+    return completedDate && completedDate >= thirtyDaysAgo;
+  }).length;
+  
+  // Archive count (> 30 days)
+  const archiveCount = orders.filter(o => {
+    if (!isCompleted(o)) return false;
+    const completedDate = getCompletedDate(o);
+    return completedDate && completedDate < thirtyDaysAgo;
+  }).length;
+  
+  // Update UI
+  if (document.getElementById('activeCount')) {
+    document.getElementById('activeCount').textContent = activeCount;
+  }
+  if (document.getElementById('completedCount')) {
+    document.getElementById('completedCount').textContent = completedCount;
+  }
+  if (document.getElementById('archiveCount')) {
+    document.getElementById('archiveCount').textContent = archiveCount;
+  }
+}
+
+function updateLoadMoreButton(totalArchive) {
+  const loadMoreContainer = document.getElementById('loadMoreContainer');
+  const loadMoreBtn = document.getElementById('loadMoreBtn');
+  const archiveInfo = document.getElementById('archiveInfo');
+  
+  if (currentOrderTab === 'archive' && totalArchive > 0) {
+    loadMoreContainer.style.display = 'block';
+    
+    const showing = Math.min(archiveOffset + archiveLimit, totalArchive);
+    archiveInfo.textContent = `Showing ${archiveOffset + 1}-${showing} of ${totalArchive} orders`;
+    
+    // Hide button if all loaded
+    if (showing >= totalArchive) {
+      loadMoreBtn.style.display = 'none';
+    } else {
+      loadMoreBtn.style.display = 'block';
+      const remaining = totalArchive - showing;
+      loadMoreBtn.textContent = `Load More (${Math.min(15, remaining)} orders)`;
+    }
+  } else {
+    loadMoreContainer.style.display = 'none';
+  }
+}
+
+function switchOrderTab(tab, el) {
+  currentOrderTab = tab;
+  archiveOffset = 0; // Reset pagination when switching tabs
+  
+  // Update tab styling
+  document.querySelectorAll('.main-tab').forEach(t => {
+    t.classList.remove('active');
+    t.style.borderBottomColor = 'transparent';
+    t.style.color = 'var(--text2)';
+  });
+  el.classList.add('active');
+  el.style.borderBottomColor = 'var(--orange)';
+  el.style.color = 'var(--orange)';
+  
+  // Reset sub-filter to "All"
+  currentOrderFilter = 'all';
+  
+  // Update sub-filter tabs based on selected main tab
+  const filterTabs = document.getElementById('orderFilterTabs');
+  
+  if (tab === 'active') {
+    filterTabs.innerHTML = `
+      <div class="filter-tab active" onclick="setOrderFilter('all',this)">All</div>
+      <div class="filter-tab" onclick="setOrderFilter('received',this)">Received</div>
+      <div class="filter-tab" onclick="setOrderFilter('inprogress',this)">In-Progress</div>
+      <div class="filter-tab" onclick="setOrderFilter('ready',this)">Ready</div>
+      <div class="filter-tab" onclick="setOrderFilter('unpaid_delivered',this)">Unpaid</div>
+    `;
+  } else if (tab === 'completed') {
+    filterTabs.innerHTML = `
+      <div class="filter-tab active" onclick="setOrderFilter('all',this)">All</div>
+      <div class="filter-tab" onclick="setOrderFilter('paid_delivered',this)">Paid</div>
+      <div class="filter-tab" onclick="setOrderFilter('cancelled',this)">Cancelled</div>
+    `;
+  } else if (tab === 'archive') {
+    filterTabs.innerHTML = `
+      <div class="filter-tab active" onclick="setOrderFilter('all',this)">All</div>
+    `;
+  }
+  
+  renderOrders();
+}
+
+function loadMoreArchive() {
+  archiveOffset += archiveLimit;
+  renderOrders();
 }
 
 function setOrderFilter(filter, el) {
@@ -1733,6 +2029,161 @@ function renderDueDatePage() {
 
   const lastUpdated = `<div style="text-align:center;padding:8px;font-size:11px;color:var(--text3);">Last updated: ${formatDateTime(new Date())}</div>`;
   document.getElementById('dueDateContent').innerHTML = html + lastUpdated;
+}
+
+// ============================================================
+// DUE DATE NEW PAGE (KANBAN STYLE)
+// ============================================================
+
+function renderDueDateNew() {
+  const allOrders = DB.get('orders') || [];
+  
+  // Filter out delivered/cancelled orders
+  const activeOrders = allOrders.filter(o => 
+    !['paid_delivered', 'unpaid_delivered', 'cancelled'].includes(o.status)
+  );
+  
+  // Generate date range: Last 7 days + Today + Next 30 days
+  const dateRange = generateDateRange();
+  
+  // Group orders by due date
+  const ordersByDate = {};
+  dateRange.forEach(date => {
+    ordersByDate[date] = activeOrders.filter(o => o.dueDate === date);
+  });
+  
+  // Render all date columns
+  const container = document.getElementById('dueDateNewContainer');
+  container.innerHTML = dateRange.map(date => renderDateColumn(date, ordersByDate[date])).join('');
+  
+  // Auto-scroll to today on first load
+  setTimeout(() => {
+    const todayColumn = document.getElementById('date-column-today');
+    if (todayColumn) {
+      todayColumn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, 100);
+}
+
+function generateDateRange() {
+  const dates = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Last 7 days
+  for (let i = 7; i >= 1; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    dates.push(date.toISOString().split('T')[0]);
+  }
+  
+  // Today
+  dates.push(today.toISOString().split('T')[0]);
+  
+  // Next 30 days
+  for (let i = 1; i <= 30; i++) {
+    const date = new Date(today);
+    date.setDate(date.getDate() + i);
+    dates.push(date.toISOString().split('T')[0]);
+  }
+  
+  return dates;
+}
+
+function renderDateColumn(dateStr, orders) {
+  const today = new Date().toISOString().split('T')[0];
+  const date = new Date(dateStr);
+  const isToday = dateStr === today;
+  const isPast = dateStr < today;
+  const hasOrders = orders && orders.length > 0;
+  
+  // Determine tag
+  let tag = '';
+  let tagStyle = '';
+  if (isPast && hasOrders) {
+    tag = '🚨 OVERDUE';
+    tagStyle = 'background:#F44336;color:white;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;';
+  } else if (isToday && hasOrders) {
+    tag = '⚠️ DUE TODAY';
+    tagStyle = 'background:#FFB300;color:white;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700;';
+  }
+  
+  // Format date header
+  const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+  const dateNum = date.getDate();
+  const monthName = date.toLocaleDateString('en-US', { month: 'short' });
+  
+  // Pre-calculate styles to avoid nested template literals
+  const headerBg = isToday ? 'var(--orange)' : 'var(--card)';
+  const headerColor = isToday ? 'white' : 'var(--text)';
+  const headerBorder = isToday ? 'var(--orange)' : 'var(--border)';
+  const headerOpacity = isToday ? 1 : 0.7;
+  const containerBg = isToday ? 'rgba(255,107,0,0.05)' : 'var(--bg)';
+  const containerBorder = isToday ? 'var(--orange)' : 'var(--border)';
+  const columnId = isToday ? 'date-column-today' : '';
+  
+  return `
+    <div class="date-column" id="${columnId}" style="min-width:150px;max-width:150px;flex-shrink:0;">
+      <!-- Date Header -->
+      <div style="background:${headerBg};color:${headerColor};padding:12px 8px;border-radius:8px 8px 0 0;border:2px solid ${headerBorder};border-bottom:none;text-align:center;">
+        <div style="font-size:11px;font-weight:600;opacity:${headerOpacity};">${dayName}</div>
+        <div style="font-size:20px;font-weight:700;line-height:1;">${dateNum}</div>
+        <div style="font-size:10px;opacity:${headerOpacity};">${monthName}</div>
+        ${tag ? '<div style="margin-top:6px;' + tagStyle + '">' + tag + '</div>' : ''}
+      </div>
+      
+      <!-- Orders Container -->
+      <div style="background:${containerBg};border:2px solid ${containerBorder};border-top:none;border-radius:0 0 8px 8px;padding:8px;min-height:100px;display:flex;flex-direction:column;gap:8px;">
+        ${hasOrders ? orders.map(o => renderCompactOrderCard(o)).join('') : `
+          <div style="text-align:center;padding:20px 8px;color:var(--text3);font-size:11px;">
+            No orders<br>due today
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function renderCompactOrderCard(order) {
+  const statusColors = {
+    received: '#2196F3',
+    inprogress: '#FF9800',
+    ready: '#4CAF50',
+    unpaid_delivered: '#9C27B0'
+  };
+  const statusLabels = {
+    received: 'Received',
+    inprogress: 'In-Progress',
+    ready: 'Ready',
+    unpaid_delivered: 'Unpaid'
+  };
+  
+  const statusColor = statusColors[order.status] || '#757575';
+  const statusLabel = statusLabels[order.status] || order.status;
+  
+  return `
+    <div onclick="showOrderDetail('${order.id}')" style="background:white;border-radius:6px;padding:8px;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.1);transition:transform 0.2s,box-shadow 0.2s;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 8px rgba(0,0,0,0.15)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)'">
+      <!-- Order ID -->
+      <div style="font-size:10px;color:var(--text3);font-weight:600;margin-bottom:4px;">${order.orderNo}</div>
+      
+      <!-- Customer Name (LARGE) -->
+      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px;line-height:1.2;">${order.customerName}</div>
+      
+      <!-- Status Badge -->
+      <div style="display:inline-block;padding:2px 8px;border-radius:12px;background:${statusColor};color:white;font-size:9px;font-weight:700;margin-bottom:6px;">${statusLabel}</div>
+      
+      <!-- Amount -->
+      <div style="font-size:12px;font-weight:700;color:var(--orange);">₹${(order.totalAmount || 0).toFixed(0)}</div>
+    </div>
+  `;
+}
+
+function scrollToToday() {
+  const todayColumn = document.getElementById('date-column-today');
+  if (todayColumn) {
+    todayColumn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    showToast('📍 Scrolled to Today', 'info');
+  }
 }
 
 function checkOverduePopup() {
@@ -2256,6 +2707,10 @@ function changeQty(serviceId, rowIndex, delta) {
   const current = parseFloat(serviceItemsData[serviceId][rowIndex].qty) || 1;
   const newQty = Math.max(1, Math.round(current + delta));
   serviceItemsData[serviceId][rowIndex].qty = newQty;
+  
+  // Update discount based on new quantity
+  updateDiscountFromQty(serviceId, rowIndex);
+  
   // Update qty input value directly without re-rendering
   const svcEl = document.getElementById('svc_' + serviceId);
   if (svcEl) {
