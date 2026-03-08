@@ -796,6 +796,11 @@ input[type="number"] {
               <div class="s-info"><div class="s-title">Shop Settings</div><div class="s-sub">Name, address, phone, hours</div></div>
               <span class="s-arrow">›</span>
             </div>
+            <div class="settings-item" onclick="showCustomerManager()">
+              <span class="s-icon">👥</span>
+              <div class="s-info"><div class="s-title">Customer Management</div><div class="s-sub">Add, edit, delete & import customers</div></div>
+              <span class="s-arrow">›</span>
+            </div>
           </div>
           <div class="settings-group">
             <div class="settings-group-title">👥 User Management</div>
@@ -945,6 +950,46 @@ input[type="number"] {
     <div class="modal-body" id="userMenuBody"></div>
   </div>
 </div>
+
+<!-- Customer Management Modal -->
+<div class="modal-overlay" id="customerModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h3>👥 Customer Management</h3>
+      <button class="modal-close" onclick="closeModal('customerModal')">✕</button>
+    </div>
+    <div class="modal-body" style="padding:16px;">
+      <!-- Search & Actions -->
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <input type="text" id="customerSearchInput" placeholder="🔍 Search customers..." 
+          oninput="filterCustomers()" 
+          style="flex:1;min-width:200px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
+        <button class="btn btn-primary" onclick="showAddCustomerForm()" style="white-space:nowrap;">
+          ＋ Add Customer
+        </button>
+      </div>
+      
+      <!-- Bulk Actions -->
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="downloadCustomersCSV()" style="flex:1;">
+          📥 Download CSV
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('customerCSVInput').click()" style="flex:1;">
+          📤 Upload CSV
+        </button>
+      </div>
+      
+      <!-- Customer List -->
+      <div id="customerListContainer" style="max-height:400px;overflow-y:auto;">
+        <div class="loading" style="padding:40px;"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden CSV input -->
+<input type="file" id="customerCSVInput" accept=".csv" style="display:none" onchange="processCustomerCSV(event)">
 
 <!-- Hidden file input for import -->
 <input type="file" id="importFileInput" accept=".json" style="display:none" onchange="processImport(event)">
@@ -2458,6 +2503,15 @@ function renderOrderForm(order, prefillCustomer) {
         <input type="text" id="f_customerName" value="${order?order.customerName:prefillCustomer?prefillCustomer.name:''}" placeholder="Enter customer name" oninput="searchCustomerSuggest(this.value)">
         <div id="customerSuggestions" style="background:white;border:1px solid var(--border);border-radius:8px;margin-top:4px;overflow:hidden;display:none;"></div>
       </div>
+      
+      <!-- Contact Picker Button (Android only) -->
+      <div id="contactPickerButton" style="display:none;margin-bottom:14px;">
+        <button type="button" onclick="pickFromContacts()"
+          style="background:linear-gradient(135deg,#4CAF50,#45a049);border:none;color:white;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:8px;width:100%;justify-content:center;box-shadow:0 2px 8px rgba(76,175,80,0.3);transition:all 0.2s;">
+          📞 Pick from Phone Contacts
+        </button>
+      </div>
+      
       <div class="field-row">
         <div class="field">
           <label>Phone *</label>
@@ -2567,6 +2621,9 @@ function renderOrderForm(order, prefillCustomer) {
 
   document.getElementById('orderModalBody').innerHTML = html;
 
+  // Check if Contact Picker API is supported and show button
+  checkContactPickerSupport();
+
   // Auto show address if order has one
   if (order && order.customerAddress) {
     setTimeout(() => autoShowAddress(order.customerAddress), 100);
@@ -2603,6 +2660,97 @@ function setDueDate(type, el) {
   else if (type === 'custom') { document.getElementById('f_dueDate').focus(); return; }
   else { date.setDate(date.getDate() + parseInt(type)); }
   document.getElementById('f_dueDate').value = date.toISOString().split('T')[0];
+}
+
+// ============================================================
+// CONTACT PICKER (Android)
+// ============================================================
+
+function checkContactPickerSupport() {
+  // Check if Contact Picker API is supported (Android Chrome, Edge, Samsung Internet)
+  if ('contacts' in navigator && 'ContactsManager' in window) {
+    const button = document.getElementById('contactPickerButton');
+    if (button) {
+      button.style.display = 'block';
+    }
+  }
+}
+
+async function pickFromContacts() {
+  try {
+    // Check if API is supported
+    if (!('contacts' in navigator)) {
+      showToast('Contact picker not supported on this device', 'error');
+      return;
+    }
+
+    // Request contacts with name and tel properties
+    const contacts = await navigator.contacts.select(
+      ['name', 'tel'],
+      { multiple: false }
+    );
+
+    if (contacts && contacts.length > 0) {
+      const contact = contacts[0];
+      
+      // Get name
+      const name = contact.name && contact.name.length > 0 ? contact.name[0] : '';
+      
+      // Get phone (remove spaces, dashes, parentheses)
+      let phone = '';
+      if (contact.tel && contact.tel.length > 0) {
+        phone = contact.tel[0].replace(/[\s\-\(\)]/g, '');
+        
+        // If phone starts with country code, try to extract 10 digits
+        if (phone.startsWith('+91')) {
+          phone = phone.substring(3); // Remove +91
+        } else if (phone.startsWith('91') && phone.length > 10) {
+          phone = phone.substring(2); // Remove 91
+        }
+        
+        // Take last 10 digits if longer
+        if (phone.length > 10) {
+          phone = phone.slice(-10);
+        }
+      }
+
+      // Fill the form
+      if (name) {
+        document.getElementById('f_customerName').value = name;
+      }
+      
+      if (phone && phone.length === 10) {
+        document.getElementById('f_customerPhone').value = phone;
+        showToast('Contact selected! ✅', 'success');
+      } else if (phone) {
+        document.getElementById('f_customerPhone').value = phone;
+        showToast('Phone number may need adjustment', 'warning');
+      } else {
+        if (name) {
+          showToast('Name filled, but no phone found', 'warning');
+        } else {
+          showToast('Could not get contact info', 'error');
+        }
+      }
+
+      // Hide suggestions if showing
+      document.getElementById('customerSuggestions').style.display = 'none';
+      
+    } else {
+      showToast('No contact selected', 'warning');
+    }
+    
+  } catch (error) {
+    console.error('Contact picker error:', error);
+    
+    // User canceled or error occurred
+    if (error.name === 'AbortError') {
+      // User canceled - don't show error
+      return;
+    }
+    
+    showToast('Could not access contacts', 'error');
+  }
 }
 
 let serviceItemsData = {};
@@ -3231,20 +3379,31 @@ function saveOrder() {
 function saveOrUpdateCustomer(data) {
   const customers = DB.get('customers') || [];
   const existing = customers.find(c => c.phone === data.phone);
+  
   if (existing) {
+    // Update existing customer
     existing.name = data.name;
-    existing.phone2 = data.phone2 || existing.phone2;
-    existing.address = data.address || existing.address;
+    existing.phone2 = data.phone2 || existing.phone2 || '';
+    existing.address = data.address || existing.address || '';
+    existing.updatedAt = new Date().toISOString();
     existing.lastVisit = new Date().toISOString();
     existing.totalOrders = (existing.totalOrders || 0) + 1;
   } else {
+    // Add new customer
     customers.push({
-      id: 'cust_' + Date.now(), name: data.name, phone: data.phone,
-      phone2: data.phone2, address: data.address,
-      createdAt: new Date().toISOString(), lastVisit: new Date().toISOString(),
+      id: 'cust_' + Date.now(),
+      name: data.name,
+      phone: data.phone,
+      phone2: data.phone2 || '',
+      email: data.email || '',
+      address: data.address || '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      lastVisit: new Date().toISOString(),
       totalOrders: 1
     });
   }
+  
   DB.set('customers', customers);
 }
 
@@ -5003,6 +5162,402 @@ function toggleUserActive(userId, active) {
   const users = DB.get('users') || [];
   const user = users.find(u => u.id === userId);
   if (user) { user.active = active; DB.set('users', users); showToast('User ' + (active?'activated':'deactivated'), active?'success':'warning'); }
+}
+
+// ============================================================
+// CUSTOMER MANAGEMENT
+// ============================================================
+
+function showCustomerManager() {
+  openModal('customerModal');
+  renderCustomerList();
+}
+
+function renderCustomerList() {
+  const customers = DB.get('customers') || [];
+  const searchTerm = (document.getElementById('customerSearchInput')?.value || '').toLowerCase();
+  
+  let filtered = customers;
+  if (searchTerm) {
+    filtered = customers.filter(c => 
+      c.name.toLowerCase().includes(searchTerm) ||
+      c.phone.includes(searchTerm)
+    );
+  }
+  
+  // Sort by name
+  filtered.sort((a, b) => a.name.localeCompare(b.name));
+  
+  const container = document.getElementById('customerListContainer');
+  
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center;padding:40px;color:var(--text3);">
+        <div style="font-size:48px;margin-bottom:12px;">👥</div>
+        <div style="font-weight:600;margin-bottom:4px;">No customers found</div>
+        <div style="font-size:12px;">${searchTerm ? 'Try different search terms' : 'Add your first customer'}</div>
+      </div>`;
+    return;
+  }
+  
+  container.innerHTML = `
+    <div style="font-size:12px;color:var(--text3);margin-bottom:12px;padding:0 4px;">
+      ${filtered.length} customer${filtered.length !== 1 ? 's' : ''}
+    </div>
+    ${filtered.map(c => `
+      <div style="background:white;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;transition:all 0.2s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'" onmouseout="this.style.boxShadow=''">
+        <div style="display:flex;align-items:flex-start;gap:12px;">
+          <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#FF6B00,#FFB300);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:white;flex-shrink:0;">${c.name.charAt(0).toUpperCase()}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:700;font-size:14px;margin-bottom:4px;">${c.name}</div>
+            <div style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+              <span>📞</span> ${c.phone}
+            </div>
+            ${c.email ? `<div style="font-size:11px;color:var(--text3);display:flex;align-items:center;gap:6px;">
+              <span>📧</span> ${c.email}
+            </div>` : ''}
+            ${c.address ? `<div style="font-size:11px;color:var(--text3);margin-top:4px;line-height:1.4;">📍 ${c.address}</div>` : ''}
+            <div style="font-size:10px;color:var(--text3);margin-top:6px;">
+              Added: ${formatDate(c.createdAt)}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+          <button class="btn btn-secondary btn-sm" onclick="editCustomer('${c.id}')" style="flex:1;">✏️ Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteCustomer('${c.id}')">🗑️ Delete</button>
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+function filterCustomers() {
+  renderCustomerList();
+}
+
+function showAddCustomerForm() {
+  const html = `
+    <div class="field">
+      <label>Customer Name *</label>
+      <input type="text" id="cust_name" placeholder="Full name" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Phone Number *</label>
+      <input type="tel" id="cust_phone" placeholder="10-digit mobile number" maxlength="10" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Email (Optional)</label>
+      <input type="email" id="cust_email" placeholder="email@example.com" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Address (Optional)</label>
+      <textarea id="cust_address" placeholder="Full address" rows="2" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px;font-family:'Poppins',sans-serif;font-size:13px;resize:vertical;"></textarea>
+    </div>
+  `;
+  
+  showPopup('👤', 'Add Customer', 'Enter customer details', html, [
+    { label:'Save', cls:'btn-primary', action:'saveNewCustomer()' },
+    { label:'Cancel', cls:'btn-secondary', action:'closePopup();showCustomerManager()' }
+  ]);
+  
+  // Focus on name field
+  setTimeout(() => document.getElementById('cust_name')?.focus(), 100);
+}
+
+function saveNewCustomer() {
+  const name = document.getElementById('cust_name').value.trim();
+  const phone = document.getElementById('cust_phone').value.trim();
+  const email = document.getElementById('cust_email').value.trim();
+  const address = document.getElementById('cust_address').value.trim();
+  
+  if (!name) {
+    showToast('Please enter customer name', 'error');
+    return;
+  }
+  
+  if (!phone || phone.length !== 10 || !/^\d{10}$/.test(phone)) {
+    showToast('Please enter valid 10-digit phone number', 'error');
+    return;
+  }
+  
+  const customers = DB.get('customers') || [];
+  
+  // Check for duplicate phone
+  if (customers.find(c => c.phone === phone)) {
+    showToast('Customer with this phone already exists!', 'error');
+    return;
+  }
+  
+  const newCustomer = {
+    id: 'cust_' + Date.now(),
+    name,
+    phone,
+    email: email || '',
+    address: address || '',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  
+  customers.push(newCustomer);
+  DB.set('customers', customers);
+  
+  showToast('Customer "' + name + '" added! ✅', 'success');
+  closePopup();
+  showCustomerManager();
+}
+
+function editCustomer(customerId) {
+  const customers = DB.get('customers') || [];
+  const customer = customers.find(c => c.id === customerId);
+  if (!customer) return;
+  
+  const html = `
+    <div class="field">
+      <label>Customer Name *</label>
+      <input type="text" id="cust_name" value="${customer.name}" placeholder="Full name" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Phone Number *</label>
+      <input type="tel" id="cust_phone" value="${customer.phone}" placeholder="10-digit mobile number" maxlength="10" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Email (Optional)</label>
+      <input type="email" id="cust_email" value="${customer.email || ''}" placeholder="email@example.com" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Address (Optional)</label>
+      <textarea id="cust_address" placeholder="Full address" rows="2" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px;font-family:'Poppins',sans-serif;font-size:13px;resize:vertical;">${customer.address || ''}</textarea>
+    </div>
+  `;
+  
+  showPopup('✏️', 'Edit Customer', 'Update customer details', html, [
+    { label:'Save', cls:'btn-primary', action:`updateCustomer('${customerId}')` },
+    { label:'Cancel', cls:'btn-secondary', action:'closePopup();showCustomerManager()' }
+  ]);
+}
+
+function updateCustomer(customerId) {
+  const name = document.getElementById('cust_name').value.trim();
+  const phone = document.getElementById('cust_phone').value.trim();
+  const email = document.getElementById('cust_email').value.trim();
+  const address = document.getElementById('cust_address').value.trim();
+  
+  if (!name) {
+    showToast('Please enter customer name', 'error');
+    return;
+  }
+  
+  if (!phone || phone.length !== 10 || !/^\d{10}$/.test(phone)) {
+    showToast('Please enter valid 10-digit phone number', 'error');
+    return;
+  }
+  
+  const customers = DB.get('customers') || [];
+  const customer = customers.find(c => c.id === customerId);
+  if (!customer) return;
+  
+  // Check for duplicate phone (excluding current customer)
+  if (customers.find(c => c.phone === phone && c.id !== customerId)) {
+    showToast('Another customer with this phone already exists!', 'error');
+    return;
+  }
+  
+  customer.name = name;
+  customer.phone = phone;
+  customer.email = email;
+  customer.address = address;
+  customer.updatedAt = new Date().toISOString();
+  
+  DB.set('customers', customers);
+  
+  showToast('Customer updated! ✅', 'success');
+  closePopup();
+  showCustomerManager();
+}
+
+function deleteCustomer(customerId) {
+  const customers = DB.get('customers') || [];
+  const customer = customers.find(c => c.id === customerId);
+  if (!customer) return;
+  
+  showConfirm('Delete Customer', `Delete "${customer.name}"? This cannot be undone.`, '🗑️', () => {
+    DB.set('customers', customers.filter(c => c.id !== customerId));
+    showToast('Customer deleted', 'warning');
+    closePopup();
+    showCustomerManager();
+  });
+}
+
+function downloadCustomersCSV() {
+  const customers = DB.get('customers') || [];
+  
+  if (customers.length === 0) {
+    showToast('No customers to export', 'warning');
+    return;
+  }
+  
+  // CSV Header
+  let csv = 'Name,Phone,Email,Address\n';
+  
+  // CSV Data
+  customers.forEach(c => {
+    const name = `"${(c.name || '').replace(/"/g, '""')}"`;
+    const phone = c.phone || '';
+    const email = `"${(c.email || '').replace(/"/g, '""')}"`;
+    const address = `"${(c.address || '').replace(/"/g, '""')}"`;
+    csv += `${name},${phone},${email},${address}\n`;
+  });
+  
+  // Download
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `TurboWash_Customers_${new Date().toISOString().split('T')[0]}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  showToast(`${customers.length} customers exported! 📥`, 'success');
+}
+
+function processCustomerCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const text = e.target.result;
+      const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+      
+      if (lines.length < 2) {
+        showToast('CSV file is empty or invalid', 'error');
+        return;
+      }
+      
+      // Parse CSV
+      const customers = DB.get('customers') || [];
+      let added = 0;
+      let skipped = 0;
+      
+      // Skip header row
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        
+        // Simple CSV parsing (handles quoted fields)
+        const fields = parseCSVLine(line);
+        
+        if (fields.length < 2) {
+          skipped++;
+          continue;
+        }
+        
+        const name = fields[0]?.trim() || '';
+        const phone = fields[1]?.trim() || '';
+        const email = fields[2]?.trim() || '';
+        const address = fields[3]?.trim() || '';
+        
+        // Validate
+        if (!name || !phone) {
+          skipped++;
+          continue;
+        }
+        
+        if (phone.length !== 10 || !/^\d{10}$/.test(phone)) {
+          skipped++;
+          continue;
+        }
+        
+        // Check duplicate
+        if (customers.find(c => c.phone === phone)) {
+          skipped++;
+          continue;
+        }
+        
+        // Add customer
+        customers.push({
+          id: 'cust_' + Date.now() + '_' + i,
+          name,
+          phone,
+          email,
+          address,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+        
+        added++;
+      }
+      
+      DB.set('customers', customers);
+      
+      showToast(`Imported: ${added} added, ${skipped} skipped`, 'success');
+      renderCustomerList();
+      
+    } catch (error) {
+      console.error('CSV parse error:', error);
+      showToast('Error parsing CSV file', 'error');
+    }
+  };
+  
+  reader.readAsText(file);
+  
+  // Reset file input
+  event.target.value = '';
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  
+  result.push(current);
+  return result;
+}
+
+// Auto-save customer when creating order
+function autoSaveCustomerFromOrder(name, phone) {
+  if (!name || !phone) return;
+  
+  // Validate phone
+  if (phone.length !== 10 || !/^\d{10}$/.test(phone)) return;
+  
+  const customers = DB.get('customers') || [];
+  
+  // Check if customer already exists
+  if (customers.find(c => c.phone === phone)) return;
+  
+  // Add new customer
+  customers.push({
+    id: 'cust_' + Date.now(),
+    name: name.trim(),
+    phone: phone.trim(),
+    email: '',
+    address: '',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
+  
+  DB.set('customers', customers);
 }
 
 // ============================================================
