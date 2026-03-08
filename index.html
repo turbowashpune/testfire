@@ -1215,9 +1215,10 @@ function initApp() {
   // Setup default users if none exist
   if (!DB.get('users')) {
     DB.set('users', [
-      { id:'u1', username:'admin', password:'admin123', name:'Admin User', role:'admin', active:true, createdAt: new Date().toISOString() },
-      { id:'u2', username:'operator', password:'op123', name:'Operator User', role:'operator', active:true, createdAt: new Date().toISOString() },
-      { id:'u3', username:'viewer', password:'view123', name:'Viewer User', role:'viewer', active:true, createdAt: new Date().toISOString() }
+      { id:'u0', username:'superadmin', password:'super123', name:'Super Admin', mobile:'9999999999', role:'superadmin', active:true, createdAt: new Date().toISOString() },
+      { id:'u1', username:'admin', password:'admin123', name:'Admin User', mobile:'9876543210', role:'admin', active:true, createdAt: new Date().toISOString() },
+      { id:'u2', username:'operator', password:'op123', name:'Operator User', mobile:'9123456789', role:'operator', active:true, createdAt: new Date().toISOString() },
+      { id:'u3', username:'viewer', password:'view123', name:'Viewer User', mobile:'9012345678', role:'viewer', active:true, createdAt: new Date().toISOString() }
     ]);
   }
   if (!DB.get('orders')) DB.set('orders', []);
@@ -1565,8 +1566,9 @@ function showTrackingPage(orderNo) {
 }
 
 function applyRoleUI() {
-  const isAdmin = currentUser.role === 'admin';
-  const isOperatorPlus = currentUser.role === 'admin' || currentUser.role === 'operator';
+  const isSuperAdmin = currentUser.role === 'superadmin';
+  const isAdmin = isSuperAdmin || currentUser.role === 'admin';
+  const isOperatorPlus = isSuperAdmin || currentUser.role === 'admin' || currentUser.role === 'operator';
 
   document.querySelectorAll('.admin-only').forEach(el => {
     el.style.display = isAdmin ? '' : 'none';
@@ -1578,14 +1580,14 @@ function applyRoleUI() {
   // Hide FAB for viewers
   document.getElementById('fabBtn').style.display = isOperatorPlus ? '' : 'none';
 
-  // Hide admin more section
+  // Hide admin more section for non-admins
   if (!isAdmin) {
     document.getElementById('adminMoreSection').style.display = 'none';
   }
 }
 
 function updateHeaderInfo() {
-  const roleLabels = { admin: '👑 Admin', operator: '⚙️ Operator', viewer: '👁️ Viewer' };
+  const roleLabels = { superadmin: '⭐ Super Admin', admin: '👑 Admin', operator: '⚙️ Operator', viewer: '👁️ Viewer' };
   document.getElementById('headerUserInfo').textContent = currentUser.name + ' · ' + (roleLabels[currentUser.role] || '');
   document.getElementById('loggedInAs').textContent = 'Logged in as ' + currentUser.name;
 }
@@ -1638,7 +1640,7 @@ function refreshDashboard() {
   document.getElementById('statReady').textContent = readyOrders.length;
   document.getElementById('statOverdue').textContent = overdueOrders.length;
 
-  if (currentUser.role === 'admin') {
+  if (currentUser.role === 'superadmin' || currentUser.role === 'admin') {
     const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const recentOrders = orders.filter(o => new Date(o.createdAt) >= thirtyDaysAgo);
     const revenue = recentOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
@@ -3334,7 +3336,9 @@ function saveOrder() {
         ...orders[idx],
         customerName: name, customerPhone: phone, customerPhone2: phone2, customerAddress: address,
         orderDate, dueDate, services: orderServices, subtotal, discount: totalDiscount, totalAmount, paidAmount, paymentMode, notes,
-        updatedAt: new Date().toISOString(), updatedBy: currentUser.name
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUser.id,
+        updatedByName: currentUser.name
       };
     }
     DB.set('orders', orders);
@@ -3354,7 +3358,9 @@ function saveOrder() {
       trackingCode: generateTrackingCode('ord_' + Date.now()),
       trackingExpiry: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
       statusHistory: [{ status:'received', changedAt: new Date().toISOString(), changedBy: currentUser.name }],
-      createdAt: new Date().toISOString(), createdBy: currentUser.name
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser.id,
+      createdByName: currentUser.name
     };
     orders.unshift(newOrder);
     DB.set('orders', orders);
@@ -3450,7 +3456,7 @@ function showOrderDetail(orderId) {
   const overdue = isOverdue(order);
 
   const statusOptions = ['received','inprogress','ready','paid_delivered','unpaid_delivered','cancelled'];
-  const isAdmin = currentUser.role === 'admin';
+  const isAdmin = currentUser.role === 'superadmin' || currentUser.role === 'admin';
   const isOperatorPlus = isAdmin || currentUser.role === 'operator';
 
   let servicesHtml = (order.services||[]).map(svc => `
@@ -3504,6 +3510,14 @@ function showOrderDetail(orderId) {
         <span style="font-size:12px;">📅 Due: <strong style="${overdue?'color:var(--danger)':''}">${formatDate(order.dueDate)}</strong></span>
       </div>
     </div>
+
+    ${order.createdByName ? `<div style="background:rgba(255,107,0,0.05);border:1px dashed rgba(255,107,0,0.3);border-radius:10px;padding:10px 12px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+        <span style="opacity:0.7;">👤 Created by:</span>
+        <strong style="color:var(--orange);">${order.createdByName}</strong>
+        ${order.updatedByName && order.updatedByName !== order.createdByName ? `<span style="opacity:0.5;margin-left:auto;font-size:11px;">Last updated by: ${order.updatedByName}</span>` : ''}
+      </div>
+    </div>` : ''}
 
     <div style="margin-bottom:12px;">
       <div style="font-weight:700;margin-bottom:8px;color:var(--text2);font-size:12px;text-transform:uppercase;">Services & Items</div>
@@ -5070,7 +5084,7 @@ function saveShopSettings() {
 // ============================================================
 function showUserManager() {
   const users = DB.get('users') || [];
-  const roleLabels = { admin:'👑 Admin', operator:'⚙️ Operator', viewer:'👁️ Viewer' };
+  const roleLabels = { superadmin:'⭐ Super Admin', admin:'👑 Admin', operator:'⚙️ Operator', viewer:'👁️ Viewer' };
 
   const html = `
     <div style="margin-bottom:12px;">
@@ -5103,23 +5117,186 @@ function showUserManager() {
 
 function addNewUser() {
   closePopup();
-  const name = prompt('Full name:');
-  if (!name) return;
-  const username = prompt('Username (for login):');
-  if (!username) return;
-  const password = prompt('Password:');
-  if (!password) return;
-  const roleChoice = prompt('Role (1=admin, 2=operator, 3=viewer):');
-  const roles = {'1':'admin','2':'operator','3':'viewer'};
-  const role = roles[roleChoice] || 'operator';
+  
+  // Only superadmin can create superadmin users
+  const isSuperAdmin = currentUser.role === 'superadmin';
+  const roleOptions = isSuperAdmin 
+    ? '<option value="superadmin">⭐ Super Admin</option><option value="admin">👑 Admin</option><option value="operator">⚙️ Operator</option><option value="viewer">👁️ Viewer</option>'
+    : '<option value="admin">👑 Admin</option><option value="operator">⚙️ Operator</option><option value="viewer">👁️ Viewer</option>';
+  
+  const html = `
+    <div class="field">
+      <label>Full Name *</label>
+      <input type="text" id="newuser_name" placeholder="e.g., Avinash Kumar" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Mobile Number *</label>
+      <input type="tel" id="newuser_mobile" placeholder="10-digit mobile" maxlength="10" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Role *</label>
+      <select id="newuser_role" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:'Poppins',sans-serif;">
+        ${roleOptions}
+      </select>
+    </div>
+    <div style="background:rgba(255,107,0,0.1);border:1px dashed var(--orange);border-radius:8px;padding:12px;margin-top:12px;">
+      <div style="font-size:11px;font-weight:600;color:var(--orange);margin-bottom:4px;">📝 Auto-Generated Credentials</div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.5;">Username and password will be auto-generated and shown after creation. Make sure to copy them!</div>
+    </div>
+  `;
+  
+  showPopup('👤', 'Add New User', 'Create a new user account', html, [
+    { label:'Create User', cls:'btn-primary', action:'saveNewUser()' },
+    { label:'Cancel', cls:'btn-secondary', action:'closePopup()' }
+  ]);
+  
+  setTimeout(() => document.getElementById('newuser_name')?.focus(), 100);
+}
 
+function saveNewUser() {
+  const name = document.getElementById('newuser_name').value.trim();
+  const mobile = document.getElementById('newuser_mobile').value.trim();
+  const role = document.getElementById('newuser_role').value;
+  
+  if (!name) {
+    showToast('Please enter full name', 'error');
+    return;
+  }
+  
+  if (!mobile || mobile.length !== 10 || !/^\d{10}$/.test(mobile)) {
+    showToast('Please enter valid 10-digit mobile number', 'error');
+    return;
+  }
+  
   const users = DB.get('users') || [];
-  if (users.find(u => u.username === username)) { showToast('Username already exists!', 'error'); return; }
-
-  users.push({ id:'u'+Date.now(), username, password, name, role, active:true, createdAt:new Date().toISOString() });
+  
+  // Check for duplicate mobile
+  if (users.find(u => u.mobile === mobile)) {
+    showToast('User with this mobile already exists!', 'error');
+    return;
+  }
+  
+  // Auto-generate username from name (lowercase, replace spaces with dots)
+  let username = name.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '') // Remove special characters
+    .replace(/\s+/g, '.') // Replace spaces with dots
+    .substring(0, 20); // Limit length
+  
+  // Make sure username is unique
+  let baseUsername = username;
+  let counter = 1;
+  while (users.find(u => u.username === username)) {
+    username = baseUsername + counter;
+    counter++;
+  }
+  
+  // Auto-generate random password (8 characters)
+  const password = generatePassword(8);
+  
+  // Create user
+  const newUser = {
+    id: 'u' + Date.now(),
+    username,
+    password,
+    name,
+    mobile,
+    role,
+    active: true,
+    createdAt: new Date().toISOString(),
+    createdBy: currentUser.id,
+    createdByName: currentUser.name
+  };
+  
+  users.push(newUser);
   DB.set('users', users);
-  showToast('User "' + name + '" added! ✅', 'success');
-  showUserManager();
+  
+  // Show credentials to copy
+  closePopup();
+  
+  const html = `
+    <div style="background:white;border:2px solid var(--orange);border-radius:12px;padding:16px;margin-bottom:16px;">
+      <div style="font-weight:700;color:var(--orange);margin-bottom:12px;font-size:15px;">✅ User Created Successfully!</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:16px;">Copy these credentials and share with the user securely:</div>
+      
+      <div style="background:rgba(0,0,0,0.03);border-radius:8px;padding:12px;margin-bottom:8px;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">USERNAME</div>
+        <div style="font-family:monospace;font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;justify-content:space-between;">
+          <span id="cred_username">${username}</span>
+          <button onclick="copyToClipboard('cred_username','Username copied!')" class="btn btn-sm" style="padding:4px 10px;font-size:11px;">📋 Copy</button>
+        </div>
+      </div>
+      
+      <div style="background:rgba(0,0,0,0.03);border-radius:8px;padding:12px;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px;">PASSWORD</div>
+        <div style="font-family:monospace;font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;justify-content:space-between;">
+          <span id="cred_password">${password}</span>
+          <button onclick="copyToClipboard('cred_password','Password copied!')" class="btn btn-sm" style="padding:4px 10px;font-size:11px;">📋 Copy</button>
+        </div>
+      </div>
+      
+      <div style="margin-top:12px;padding:10px;background:rgba(255,107,0,0.08);border-radius:6px;font-size:11px;color:var(--text2);line-height:1.5;">
+        ⚠️ <strong>Important:</strong> Save these credentials now. You won't be able to see the password again. User can change it after first login.
+      </div>
+    </div>
+    
+    <div style="padding:12px;background:rgba(0,0,0,0.03);border-radius:8px;">
+      <div style="font-size:12px;margin-bottom:8px;">
+        <strong>Name:</strong> ${name}
+      </div>
+      <div style="font-size:12px;margin-bottom:8px;">
+        <strong>Mobile:</strong> ${mobile}
+      </div>
+      <div style="font-size:12px;">
+        <strong>Role:</strong> ${role === 'superadmin' ? '⭐ Super Admin' : role === 'admin' ? '👑 Admin' : role === 'operator' ? '⚙️ Operator' : '👁️ Viewer'}
+      </div>
+    </div>
+  `;
+  
+  showPopup('🎉', 'User Created', '', html, [
+    { label:'Done', cls:'btn-primary btn-full', action:'closePopup();showUserManager()' }
+  ]);
+}
+
+function generatePassword(length) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  let password = '';
+  for (let i = 0; i < length; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+}
+
+function copyToClipboard(elementId, successMsg) {
+  const element = document.getElementById(elementId);
+  const text = element.textContent;
+  
+  // Try modern clipboard API
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast(successMsg || 'Copied!', 'success');
+    }).catch(() => {
+      // Fallback
+      fallbackCopy(text, successMsg);
+    });
+  } else {
+    fallbackCopy(text, successMsg);
+  }
+}
+
+function fallbackCopy(text, successMsg) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand('copy');
+    showToast(successMsg || 'Copied!', 'success');
+  } catch (err) {
+    showToast('Could not copy', 'error');
+  }
+  document.body.removeChild(textarea);
 }
 
 function editUser(userId) {
@@ -5127,12 +5304,28 @@ function editUser(userId) {
   const users = DB.get('users') || [];
   const user = users.find(u => u.id === userId);
   if (!user) return;
+  
   const name = prompt('Full name:', user.name);
   if (!name) return;
-  const roleChoice = prompt('Role (1=admin, 2=operator, 3=viewer):', user.role==='admin'?'1':user.role==='operator'?'2':'3');
-  const roles = {'1':'admin','2':'operator','3':'viewer'};
+  
+  // Only superadmin can assign superadmin role
+  const isSuperAdmin = currentUser.role === 'superadmin';
+  const rolePrompt = isSuperAdmin 
+    ? 'Role (0=superadmin, 1=admin, 2=operator, 3=viewer):'
+    : 'Role (1=admin, 2=operator, 3=viewer):';
+  const currentRoleNum = user.role==='superadmin'?'0':user.role==='admin'?'1':user.role==='operator'?'2':'3';
+  
+  const roleChoice = prompt(rolePrompt, currentRoleNum);
+  const roles = isSuperAdmin 
+    ? {'0':'superadmin','1':'admin','2':'operator','3':'viewer'}
+    : {'1':'admin','2':'operator','3':'viewer'};
+  
   user.name = name;
   user.role = roles[roleChoice] || user.role;
+  user.updatedBy = currentUser.id;
+  user.updatedByName = currentUser.name;
+  user.updatedAt = new Date().toISOString();
+  
   DB.set('users', users);
   showToast('User updated! ✅', 'success');
   showUserManager();
@@ -5786,7 +5979,7 @@ function showNotifications() {
 }
 
 function showUserMenu() {
-  const roleLabels = { admin:'👑 Admin', operator:'⚙️ Operator', viewer:'👁️ Viewer' };
+  const roleLabels = { superadmin:'⭐ Super Admin', admin:'👑 Admin', operator:'⚙️ Operator', viewer:'👁️ Viewer' };
   const html = `
     <div style="text-align:center;padding:8px 0 16px;">
       <div style="width:64px;height:64px;border-radius:20px;background:linear-gradient(135deg,var(--orange),var(--yellow));display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;color:white;margin:0 auto 8px;font-family:'Nunito',sans-serif;">${currentUser.name.charAt(0)}</div>
