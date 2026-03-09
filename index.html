@@ -1220,6 +1220,24 @@ function initApp() {
       { id:'u2', username:'operator', password:'op123', name:'Operator User', mobile:'9123456789', role:'operator', active:true, createdAt: new Date().toISOString() },
       { id:'u3', username:'viewer', password:'view123', name:'Viewer User', mobile:'9012345678', role:'viewer', active:true, createdAt: new Date().toISOString() }
     ]);
+  } else {
+    // Add superadmin to existing users if not present (for upgrade)
+    const users = DB.get('users');
+    const hasSuperAdmin = users.find(u => u.username === 'superadmin');
+    if (!hasSuperAdmin) {
+      users.unshift({
+        id: 'u0',
+        username: 'superadmin',
+        password: 'super123',
+        name: 'Super Admin',
+        mobile: '9999999999',
+        role: 'superadmin',
+        active: true,
+        createdAt: new Date().toISOString()
+      });
+      DB.set('users', users);
+      console.log('✅ Superadmin user added to existing database');
+    }
   }
   if (!DB.get('orders')) DB.set('orders', []);
   if (!DB.get('customers')) DB.set('customers', []);
