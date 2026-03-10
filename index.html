@@ -282,6 +282,9 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
   background:white; border-radius:24px 24px 0 0; width:100%; max-width:500px;
   max-height:92vh; overflow-y:auto; padding:0; animation:slideUp 0.3s ease;
 }
+.modal-large {
+  max-width:600px;
+}
 .modal::-webkit-scrollbar { display:none; }
 @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
 .modal-handle { width:40px; height:4px; background:var(--border); border-radius:2px; margin:12px auto 0; }
@@ -413,6 +416,8 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
 }
 .popup-overlay.active { display:flex; }
 .popup { background:white; border-radius:20px; width:100%; max-width:380px; overflow:hidden; animation:popIn 0.3s ease; }
+.popup-large { max-width:600px; }
+.popup-large .popup-body { max-height:500px; }
 @keyframes popIn { from{transform:scale(0.8);opacity:0} to{transform:scale(1);opacity:1} }
 .popup-header { padding:20px 20px 16px; text-align:center; }
 .popup-icon { font-size:48px; margin-bottom:8px; }
@@ -799,6 +804,16 @@ input[type="number"] {
             <div class="settings-item" onclick="showCustomerManager()">
               <span class="s-icon">👥</span>
               <div class="s-info"><div class="s-title">Customer Management</div><div class="s-sub">Add, edit, delete & import customers</div></div>
+              <span class="s-arrow">›</span>
+            </div>
+            <div class="settings-item admin-only" onclick="showExpenseManager()">
+              <span class="s-icon">💰</span>
+              <div class="s-info"><div class="s-title">Expense Manager</div><div class="s-sub">Track salary, bills & expenses</div></div>
+              <span class="s-arrow">›</span>
+            </div>
+            <div class="settings-item admin-only" onclick="showProfitLossReport()">
+              <span class="s-icon">📊</span>
+              <div class="s-info"><div class="s-title">Profit & Loss Report</div><div class="s-sub">Income, expenses & profitability</div></div>
               <span class="s-arrow">›</span>
             </div>
           </div>
@@ -1241,6 +1256,7 @@ function initApp() {
   }
   if (!DB.get('orders')) DB.set('orders', []);
   if (!DB.get('customers')) DB.set('customers', []);
+  if (!DB.get('expenses')) DB.set('expenses', []);
   if (!DB.get('orderCounter')) DB.set('orderCounter', 0);
 
   // Check if this is a tracking URL
@@ -1360,8 +1376,40 @@ Please collect at your earliest convenience.
 Balance Due: ₹{balanceDue}
 
 Thank you for choosing TurboWash Laundry!
-📞 +91-9011637090`
+📞 +91-9011637090`,
+      feedbackRequest: `Hi {customerName}! 👋
+
+Thank you for choosing {shopName}! 
+
+We hope you loved our service. 😊
+
+We'd greatly appreciate if you could share your experience and leave us a review:
+
+https://g.page/r/CSwr2HBg6-ovEAE/review
+
+Your feedback helps us serve you better! 🙏
+
+- {shopName} Team`
     });
+  } else {
+    // Add feedback template to existing templates if not present
+    const templates = DB.get('whatsappTemplates');
+    if (!templates.feedbackRequest) {
+      templates.feedbackRequest = `Hi {customerName}! 👋
+
+Thank you for choosing {shopName}! 
+
+We hope you loved our service. 😊
+
+We'd greatly appreciate if you could share your experience and leave us a review:
+
+https://g.page/r/CSwr2HBg6-ovEAE/review
+
+Your feedback helps us serve you better! 🙏
+
+- {shopName} Team`;
+      DB.set('whatsappTemplates', templates);
+    }
   }
 
   // Logo removed - embedLogo kept for future use
@@ -2029,6 +2077,14 @@ function renderOrderCard(order) {
         📄 Share Invoice
       </button>
     </div>
+    ${order.status === 'paid_delivered' ? `<div style="margin-top:6px;">
+      ${order.feedbackRequested ? `<div style="padding:8px 10px;background:rgba(76,175,80,0.1);border:1.5px solid #4CAF50;border-radius:8px;color:#2E7D32;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;">
+        ✅ Feedback Sent
+      </div>` : `<button onclick="event.stopPropagation();sendFeedbackRequest('${order.id}')"
+        style="width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid #9C27B0;background:rgba(156,39,176,0.1);color:#7B1FA2;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
+        ⭐ Ask for Feedback
+      </button>`}
+    </div>` : ''}
     ${needsNotification ? `<div style="margin-top:8px;padding:8px 10px;background:linear-gradient(135deg,#FFB300,#F57F17);border-radius:8px;display:flex;align-items:center;gap:8px;position:relative;">
       <span style="font-size:16px;">📢</span>
       <div style="flex:1;color:white;">
@@ -3820,6 +3876,41 @@ function sendWhatsAppFromDetail(orderId) {
   setTimeout(() => { renderOrders(); renderDueDatePage(); refreshDashboard(); }, 300);
 }
 
+function sendFeedbackRequest(orderId) {
+  const orders = DB.get('orders') || [];
+  const order = orders.find(o => o.id === orderId);
+  if (!order) return;
+  
+  // Get feedback template
+  const templates = DB.get('whatsappTemplates') || {};
+  let template = templates.feedbackRequest || '';
+  const shop = DB.get('shopSettings') || {};
+  
+  // Replace placeholders
+  let msg = template
+    .replace(/{customerName}/g, order.customerName)
+    .replace(/{shopName}/g, shop.name || 'TurboWash Laundry');
+  
+  // Send WhatsApp
+  const phone = order.customerPhone.replace(/[^0-9]/g, '');
+  const url = `https://wa.me/${phone.startsWith('91') ? phone : '91' + phone}?text=${encodeURIComponent(msg)}`;
+  window.open(url, '_blank');
+  
+  // Mark feedback as requested
+  order.feedbackRequested = true;
+  order.feedbackRequestedAt = new Date().toISOString();
+  DB.set('orders', orders);
+  
+  showToast('Feedback request sent! ⭐', 'success');
+  
+  // Refresh UI
+  setTimeout(() => {
+    renderOrders();
+    renderDueDatePage();
+    refreshDashboard();
+  }, 300);
+}
+
 // ============================================================
 // INVOICE
 // ============================================================
@@ -5044,6 +5135,10 @@ function showWhatsAppTemplates() {
       <div style="font-weight:700;font-size:13px;margin-bottom:6px;color:var(--success);">✅ Order Ready Template</div>
       <textarea id="tmpl_orderReady" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:'Poppins',sans-serif;min-height:120px;">${templates.orderReady||''}</textarea>
     </div>
+    <div style="margin-bottom:16px;">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px;color:#9C27B0;">⭐ Feedback Request Template</div>
+      <textarea id="tmpl_feedbackRequest" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:'Poppins',sans-serif;min-height:140px;">${templates.feedbackRequest||''}</textarea>
+    </div>
     <div style="background:rgba(255,107,0,0.08);border-radius:10px;padding:10px;font-size:11px;color:var(--text2);">
       <strong>Available variables:</strong><br>
       {customerName}, {orderNo}, {services}, {totalAmount}, {advancePaid}, {balanceDue}, {dueDate}, {shopName}, {shopPhone}
@@ -5058,7 +5153,8 @@ function showWhatsAppTemplates() {
 function saveWhatsAppTemplates() {
   const templates = {
     orderReceived: document.getElementById('tmpl_orderReceived').value,
-    orderReady: document.getElementById('tmpl_orderReady').value
+    orderReady: document.getElementById('tmpl_orderReady').value,
+    feedbackRequest: document.getElementById('tmpl_feedbackRequest').value
   };
   DB.set('whatsappTemplates', templates);
   showToast('Templates saved! ✅', 'success');
@@ -5772,6 +5868,409 @@ function autoSaveCustomerFromOrder(name, phone) {
 }
 
 // ============================================================
+// EXPENSE MANAGER
+// ============================================================
+function showExpenseManager() {
+  const expenses = DB.get('expenses') || [];
+  const sorted = expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  const expenseRows = sorted.map(exp => {
+    const categoryIcons = {
+      salary: '💼', electricity: '⚡', rent: '🏠', stationery: '📝',
+      maintenance: '🔧', transport: '🚗', other: '📦'
+    };
+    const icon = categoryIcons[exp.category] || '💰';
+    
+    return `
+      <div style="background:white;border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;">
+        <div style="display:flex;align-items:start;gap:10px;">
+          <div style="font-size:24px;flex-shrink:0;">${icon}</div>
+          <div style="flex:1;">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:4px;">
+              <div>
+                <div style="font-weight:700;font-size:14px;text-transform:capitalize;">${exp.category}</div>
+                <div style="font-size:12px;color:var(--text2);">${exp.description || '-'}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-weight:800;font-size:16px;color:var(--danger);">₹${parseFloat(exp.amount || 0).toFixed(0)}</div>
+                <div style="font-size:11px;color:var(--text3);">${formatDate(exp.date)}</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:8px;">
+              <button onclick="event.stopPropagation();editExpense('${exp.id}')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--border);background:white;color:var(--text);font-size:11px;font-weight:600;cursor:pointer;">✏️ Edit</button>
+              <button onclick="event.stopPropagation();deleteExpense('${exp.id}')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--danger);background:rgba(244,67,54,0.1);color:var(--danger);font-size:11px;font-weight:600;cursor:pointer;">🗑 Delete</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  const totalExpenses = expenses.reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+  
+  const html = `
+    <div style="background:linear-gradient(135deg,#F44336,#D32F2F);border-radius:12px;padding:16px;margin-bottom:12px;color:white;">
+      <div style="font-size:12px;opacity:0.9;margin-bottom:4px;">Total Expenses</div>
+      <div style="font-size:28px;font-weight:900;font-family:'Nunito',sans-serif;">₹${totalExpenses.toFixed(0)}</div>
+      <div style="font-size:11px;opacity:0.8;margin-top:4px;">${expenses.length} expense${expenses.length !== 1 ? 's' : ''} recorded</div>
+    </div>
+    
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button class="btn btn-primary btn-full" onclick="closePopup();showAddExpenseForm()">+ Add Expense</button>
+      <button class="btn btn-secondary" onclick="downloadExpensesCSV()" style="padding:0 16px;">📥 CSV</button>
+    </div>
+    
+    <div style="max-height:400px;overflow-y:auto;">
+      ${expenseRows.length > 0 ? expenseRows : '<div style="text-align:center;padding:40px 20px;color:var(--text3);"><div style="font-size:48px;margin-bottom:12px;">💰</div><div>No expenses recorded yet</div><div style="font-size:12px;margin-top:4px;">Add your first expense to start tracking</div></div>'}
+    </div>
+  `;
+  
+  showPopup('💰', 'Expense Manager', 'Track business expenses', html, [
+    { label:'Close', cls:'btn-secondary', action:'closePopup()' }
+  ]);
+}
+
+function showAddExpenseForm() {
+  const today = new Date().toISOString().split('T')[0];
+  
+  const html = `
+    <div class="field">
+      <label>Date *</label>
+      <input type="date" id="exp_date" value="${today}" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Category *</label>
+      <select id="exp_category" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:'Poppins',sans-serif;">
+        <option value="salary">💼 Salary</option>
+        <option value="electricity">⚡ Electricity Bill</option>
+        <option value="rent">🏠 Rent</option>
+        <option value="stationery">📝 Stationery</option>
+        <option value="maintenance">🔧 Maintenance</option>
+        <option value="transport">🚗 Transport</option>
+        <option value="other">📦 Other</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <input type="text" id="exp_description" placeholder="e.g., Staff salary for March" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Amount *</label>
+      <input type="number" id="exp_amount" placeholder="0.00" step="0.01" style="width:100%;">
+    </div>
+  `;
+  
+  showPopup('💰', 'Add Expense', 'Record a business expense', html, [
+    { label:'Save Expense', cls:'btn-primary', action:'saveExpense()' },
+    { label:'Cancel', cls:'btn-secondary', action:'closePopup();showExpenseManager()' }
+  ]);
+  
+  setTimeout(() => document.getElementById('exp_date')?.focus(), 100);
+}
+
+function saveExpense(editId) {
+  const date = document.getElementById('exp_date').value;
+  const category = document.getElementById('exp_category').value;
+  const description = document.getElementById('exp_description').value.trim();
+  const amount = parseFloat(document.getElementById('exp_amount').value);
+  
+  if (!date) {
+    showToast('Please select date', 'error');
+    return;
+  }
+  
+  if (!amount || amount <= 0) {
+    showToast('Please enter valid amount', 'error');
+    return;
+  }
+  
+  const expenses = DB.get('expenses') || [];
+  
+  if (editId) {
+    // Edit existing
+    const idx = expenses.findIndex(e => e.id === editId);
+    if (idx > -1) {
+      expenses[idx] = {
+        ...expenses[idx],
+        date,
+        category,
+        description,
+        amount,
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUser.id,
+        updatedByName: currentUser.name
+      };
+    }
+    showToast('Expense updated! ✅', 'success');
+  } else {
+    // Add new
+    const newExpense = {
+      id: 'exp_' + Date.now(),
+      date,
+      category,
+      description,
+      amount,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser.id,
+      createdByName: currentUser.name
+    };
+    expenses.push(newExpense);
+    showToast('Expense added! ✅', 'success');
+  }
+  
+  DB.set('expenses', expenses);
+  closePopup();
+  showExpenseManager();
+}
+
+function editExpense(id) {
+  closePopup();
+  
+  const expenses = DB.get('expenses') || [];
+  const expense = expenses.find(e => e.id === id);
+  if (!expense) return;
+  
+  const html = `
+    <div class="field">
+      <label>Date *</label>
+      <input type="date" id="exp_date" value="${expense.date}" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Category *</label>
+      <select id="exp_category" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:'Poppins',sans-serif;">
+        <option value="salary" ${expense.category==='salary'?'selected':''}>💼 Salary</option>
+        <option value="electricity" ${expense.category==='electricity'?'selected':''}>⚡ Electricity Bill</option>
+        <option value="rent" ${expense.category==='rent'?'selected':''}>🏠 Rent</option>
+        <option value="stationery" ${expense.category==='stationery'?'selected':''}>📝 Stationery</option>
+        <option value="maintenance" ${expense.category==='maintenance'?'selected':''}>🔧 Maintenance</option>
+        <option value="transport" ${expense.category==='transport'?'selected':''}>🚗 Transport</option>
+        <option value="other" ${expense.category==='other'?'selected':''}>📦 Other</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <input type="text" id="exp_description" value="${expense.description||''}" placeholder="e.g., Staff salary for March" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Amount *</label>
+      <input type="number" id="exp_amount" value="${expense.amount}" step="0.01" style="width:100%;">
+    </div>
+  `;
+  
+  showPopup('✏️', 'Edit Expense', 'Update expense details', html, [
+    { label:'Update', cls:'btn-primary', action:`saveExpense('${id}')` },
+    { label:'Cancel', cls:'btn-secondary', action:'closePopup();showExpenseManager()' }
+  ]);
+}
+
+function deleteExpense(id) {
+  closePopup();
+  
+  showConfirm(
+    'Delete Expense',
+    'Are you sure you want to delete this expense? This cannot be undone.',
+    '🗑',
+    () => {
+      const expenses = DB.get('expenses') || [];
+      const filtered = expenses.filter(e => e.id !== id);
+      DB.set('expenses', filtered);
+      showToast('Expense deleted! ✅', 'success');
+      showExpenseManager();
+    },
+    () => {
+      showExpenseManager();
+    }
+  );
+}
+
+function downloadExpensesCSV() {
+  const expenses = DB.get('expenses') || [];
+  if (expenses.length === 0) {
+    showToast('No expenses to export', 'error');
+    return;
+  }
+  
+  const sorted = expenses.sort((a, b) => new Date(a.date) - new Date(b.date));
+  
+  let csv = 'Date,Category,Description,Amount\n';
+  sorted.forEach(exp => {
+    csv += `${exp.date},"${exp.category}","${(exp.description || '').replace(/"/g, '""')}",${exp.amount}\n`;
+  });
+  
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  const today = new Date().toISOString().split('T')[0];
+  link.setAttribute('href', url);
+  link.setAttribute('download', `TurboWash_Expenses_${today}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  showToast('Expenses exported! 📥', 'success');
+}
+
+// ============================================================
+// PROFIT & LOSS REPORT
+// ============================================================
+function showProfitLossReport() {
+  const now = new Date();
+  const currentMonth = now.getMonth(); // 0-11
+  const currentYear = now.getFullYear();
+  
+  const html = `
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <select id="pl_month" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:'Poppins',sans-serif;">
+          <option value="0" ${currentMonth===0?'selected':''}>January</option>
+          <option value="1" ${currentMonth===1?'selected':''}>February</option>
+          <option value="2" ${currentMonth===2?'selected':''}>March</option>
+          <option value="3" ${currentMonth===3?'selected':''}>April</option>
+          <option value="4" ${currentMonth===4?'selected':''}>May</option>
+          <option value="5" ${currentMonth===5?'selected':''}>June</option>
+          <option value="6" ${currentMonth===6?'selected':''}>July</option>
+          <option value="7" ${currentMonth===7?'selected':''}>August</option>
+          <option value="8" ${currentMonth===8?'selected':''}>September</option>
+          <option value="9" ${currentMonth===9?'selected':''}>October</option>
+          <option value="10" ${currentMonth===10?'selected':''}>November</option>
+          <option value="11" ${currentMonth===11?'selected':''}>December</option>
+        </select>
+        <select id="pl_year" style="width:120px;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:'Poppins',sans-serif;">
+          <option value="${currentYear-2}">${currentYear-2}</option>
+          <option value="${currentYear-1}">${currentYear-1}</option>
+          <option value="${currentYear}" selected>${currentYear}</option>
+          <option value="${currentYear+1}">${currentYear+1}</option>
+        </select>
+        <button onclick="renderPLReport()" class="btn btn-primary" style="padding:10px 16px;">Show</button>
+      </div>
+    </div>
+    
+    <div id="plReportContent"></div>
+  `;
+  
+  showPopup('📊', 'Profit & Loss Report', 'Monthly financial statement', html, [
+    { label:'Export PDF', cls:'btn-primary', action:'exportPLReportPDF()' },
+    { label:'Close', cls:'btn-secondary', action:'closePopup()' }
+  ], 'popup-large');
+  
+  // Render initial report
+  setTimeout(() => renderPLReport(), 100);
+}
+
+function renderPLReport() {
+  const month = parseInt(document.getElementById('pl_month').value);
+  const year = parseInt(document.getElementById('pl_year').value);
+  
+  // Get month name
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const monthName = monthNames[month];
+  
+  // Calculate date range
+  const startDate = new Date(year, month, 1);
+  const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+  
+  // Get orders (income from paid orders)
+  const orders = DB.get('orders') || [];
+  const monthOrders = orders.filter(o => {
+    const orderDate = new Date(o.createdAt);
+    return orderDate >= startDate && orderDate <= endDate && 
+           (o.status === 'paid_delivered' || o.paidAmount > 0);
+  });
+  
+  const totalIncome = monthOrders.reduce((sum, o) => sum + (parseFloat(o.paidAmount) || 0), 0);
+  const totalRevenue = monthOrders.reduce((sum, o) => sum + (parseFloat(o.totalAmount) || 0), 0);
+  
+  // Get expenses
+  const expenses = DB.get('expenses') || [];
+  const monthExpenses = expenses.filter(e => {
+    const expDate = new Date(e.date);
+    return expDate >= startDate && expDate <= endDate;
+  });
+  
+  const totalExpenses = monthExpenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
+  
+  // Calculate profit/loss
+  const netProfit = totalIncome - totalExpenses;
+  const profitMargin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0;
+  
+  // Expense breakdown by category
+  const expenseByCategory = {};
+  monthExpenses.forEach(e => {
+    expenseByCategory[e.category] = (expenseByCategory[e.category] || 0) + parseFloat(e.amount || 0);
+  });
+  
+  const categoryRows = Object.entries(expenseByCategory)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, amt]) => {
+      const categoryIcons = {
+        salary: '💼', electricity: '⚡', rent: '🏠', stationery: '📝',
+        maintenance: '🔧', transport: '🚗', other: '📦'
+      };
+      const icon = categoryIcons[cat] || '💰';
+      const percentage = totalExpenses > 0 ? (amt / totalExpenses) * 100 : 0;
+      
+      return `
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:18px;">${icon}</span>
+            <span style="text-transform:capitalize;font-size:13px;">${cat}</span>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-weight:700;font-size:14px;">₹${amt.toFixed(0)}</div>
+            <div style="font-size:11px;color:var(--text3);">${percentage.toFixed(1)}%</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  
+  const html = `
+    <div style="background:linear-gradient(135deg,#4CAF50,#2E7D32);border-radius:12px;padding:20px;margin-bottom:16px;color:white;text-align:center;">
+      <div style="font-size:14px;opacity:0.9;margin-bottom:4px;">${monthName} ${year}</div>
+      <div style="font-size:32px;font-weight:900;font-family:'Nunito',sans-serif;margin-bottom:8px;">${netProfit >= 0 ? 'Profit' : 'Loss'}</div>
+      <div style="font-size:36px;font-weight:900;font-family:'Nunito',sans-serif;color:${netProfit >= 0 ? '#C8E6C9' : '#FFCDD2'};">₹${Math.abs(netProfit).toFixed(0)}</div>
+      <div style="font-size:13px;opacity:0.8;margin-top:8px;">Profit Margin: ${profitMargin.toFixed(1)}%</div>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div style="background:rgba(76,175,80,0.1);border:2px solid #4CAF50;border-radius:12px;padding:16px;">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">💰 Total Income</div>
+        <div style="font-size:24px;font-weight:900;color:#2E7D32;">₹${totalIncome.toFixed(0)}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">${monthOrders.length} order${monthOrders.length !== 1 ? 's' : ''}</div>
+      </div>
+      
+      <div style="background:rgba(244,67,54,0.1);border:2px solid #F44336;border-radius:12px;padding:16px;">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">💸 Total Expenses</div>
+        <div style="font-size:24px;font-weight:900;color:#C62828;">₹${totalExpenses.toFixed(0)}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">${monthExpenses.length} expense${monthExpenses.length !== 1 ? 's' : ''}</div>
+      </div>
+    </div>
+    
+    ${categoryRows ? `
+      <div style="background:white;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+        <div style="font-weight:700;font-size:14px;margin-bottom:12px;color:var(--text);">📊 Expense Breakdown</div>
+        ${categoryRows}
+      </div>
+    ` : ''}
+    
+    <div style="background:rgba(255,193,7,0.1);border:1px dashed #FFA000;border-radius:10px;padding:12px;font-size:12px;color:var(--text2);">
+      <strong>💡 Key Insights:</strong><br>
+      • Average daily income: ₹${(totalIncome / new Date(year, month + 1, 0).getDate()).toFixed(0)}<br>
+      • Average daily expense: ₹${(totalExpenses / new Date(year, month + 1, 0).getDate()).toFixed(0)}<br>
+      • Total revenue (unpaid included): ₹${totalRevenue.toFixed(0)}<br>
+      • Operating efficiency: ${totalExpenses > 0 && totalIncome > 0 ? ((1 - (totalExpenses / totalIncome)) * 100).toFixed(1) : '0'}%
+    </div>
+  `;
+  
+  document.getElementById('plReportContent').innerHTML = html;
+}
+
+function exportPLReportPDF() {
+  // For now, show a message - PDF export can be added later with jsPDF library
+  showToast('PDF export coming soon! For now, use screenshot.', 'info');
+}
+
+// ============================================================
 // CHANGE PASSWORD
 // ============================================================
 function showChangePassword() {
@@ -6023,7 +6522,7 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('active'); });
 });
 
-function showPopup(icon, title, msg, bodyHtml, buttons) {
+function showPopup(icon, title, msg, bodyHtml, buttons, modalClass) {
   document.getElementById('popupIcon').textContent = icon;
   document.getElementById('popupTitle').textContent = title;
   document.getElementById('popupMsg').textContent = msg;
@@ -6031,6 +6530,15 @@ function showPopup(icon, title, msg, bodyHtml, buttons) {
   document.getElementById('popupFooter').innerHTML = buttons.map(b =>
     `<button class="btn ${b.cls}" style="flex:1" onclick="${b.action}">${b.label}</button>`
   ).join('');
+  
+  // Apply modal class if provided
+  const popup = document.querySelector('#genericPopup .popup');
+  if (modalClass) {
+    popup.className = 'popup ' + modalClass;
+  } else {
+    popup.className = 'popup';
+  }
+  
   document.getElementById('genericPopup').classList.add('active');
 }
 
@@ -6172,6 +6680,692 @@ function showTrackingPage(trackingCode) {
   }
   
   document.body.appendChild(trackingPage);
+}
+
+// ============================================================
+// EXPENSE MANAGEMENT (Admin Only)
+// ============================================================
+function showExpenseManager() {
+  const expenses = DB.get('expenses') || [];
+  
+  const html = `
+    <div style="margin-bottom:12px;display:flex;gap:8px;">
+      <button class="btn btn-primary" style="flex:1;" onclick="showAddExpenseForm()">+ Add Expense</button>
+      <button class="btn btn-secondary" onclick="downloadExpensesCSV()">📥 Download CSV</button>
+    </div>
+    
+    <div style="margin-bottom:12px;">
+      <input type="text" id="expenseSearch" placeholder="🔍 Search expenses..." 
+        onkeyup="filterExpenses()" 
+        style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;">
+    </div>
+    
+    <div id="expenseListContainer" style="max-height:400px;overflow-y:auto;">
+      <!-- Expense list will be rendered here -->
+    </div>
+  `;
+  
+  showPopup('💰', 'Expense Manager', 'Track your business expenses', html, [
+    { label:'Close', cls:'btn-secondary', action:'closePopup()' }
+  ]);
+  
+  renderExpenseList();
+}
+
+function renderExpenseList() {
+  const expenses = DB.get('expenses') || [];
+  const container = document.getElementById('expenseListContainer');
+  if (!container) return;
+  
+  // Sort by date (newest first)
+  const sortedExpenses = expenses.sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  if (sortedExpenses.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center;padding:40px 20px;color:var(--text3);">
+        <div style="font-size:48px;margin-bottom:12px;">💰</div>
+        <div style="font-weight:700;margin-bottom:4px;">No Expenses Yet</div>
+        <div style="font-size:13px;">Click "+ Add Expense" to start tracking</div>
+      </div>`;
+    return;
+  }
+  
+  const html = sortedExpenses.map(exp => `
+    <div class="expense-item" style="background:white;border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;">
+      <div style="display:flex;align-items:start;gap:12px;">
+        <div style="flex:1;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <span style="font-size:20px;">${getCategoryIcon(exp.category)}</span>
+            <div>
+              <div style="font-weight:700;font-size:14px;">${exp.category}</div>
+              <div style="font-size:11px;color:var(--text3);">${formatDate(exp.date)}</div>
+            </div>
+          </div>
+          ${exp.description ? `<div style="font-size:12px;color:var(--text2);margin-top:4px;">${exp.description}</div>` : ''}
+          ${exp.createdByName ? `<div style="font-size:10px;color:var(--text3);margin-top:4px;">Added by: ${exp.createdByName}</div>` : ''}
+        </div>
+        <div style="text-align:right;">
+          <div style="font-weight:800;font-size:16px;color:var(--danger);">₹${parseFloat(exp.amount).toFixed(2)}</div>
+          <div style="margin-top:6px;display:flex;gap:4px;">
+            <button onclick="event.stopPropagation();editExpense('${exp.id}')" 
+              class="btn btn-sm" style="padding:4px 8px;font-size:11px;">✏️</button>
+            <button onclick="event.stopPropagation();deleteExpense('${exp.id}')" 
+              class="btn btn-sm btn-danger" style="padding:4px 8px;font-size:11px;">🗑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+  
+  container.innerHTML = html;
+}
+
+function getCategoryIcon(category) {
+  const icons = {
+    'Salary': '👨‍💼',
+    'Electricity': '⚡',
+    'Water': '💧',
+    'Rent': '🏠',
+    'Internet': '🌐',
+    'Stationary': '📝',
+    'Maintenance': '🔧',
+    'Marketing': '📢',
+    'Transport': '🚗',
+    'Other': '💳'
+  };
+  return icons[category] || '💰';
+}
+
+function filterExpenses() {
+  const search = document.getElementById('expenseSearch').value.toLowerCase();
+  const expenses = DB.get('expenses') || [];
+  
+  const filtered = expenses.filter(exp => 
+    exp.category.toLowerCase().includes(search) ||
+    (exp.description && exp.description.toLowerCase().includes(search)) ||
+    exp.amount.toString().includes(search)
+  );
+  
+  const container = document.getElementById('expenseListContainer');
+  if (filtered.length === 0) {
+    container.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text3);">No matching expenses found</div>`;
+    return;
+  }
+  
+  // Re-render with filtered results
+  const sortedExpenses = filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  const html = sortedExpenses.map(exp => `
+    <div class="expense-item" style="background:white;border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;">
+      <div style="display:flex;align-items:start;gap:12px;">
+        <div style="flex:1;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <span style="font-size:20px;">${getCategoryIcon(exp.category)}</span>
+            <div>
+              <div style="font-weight:700;font-size:14px;">${exp.category}</div>
+              <div style="font-size:11px;color:var(--text3);">${formatDate(exp.date)}</div>
+            </div>
+          </div>
+          ${exp.description ? `<div style="font-size:12px;color:var(--text2);margin-top:4px;">${exp.description}</div>` : ''}
+          ${exp.createdByName ? `<div style="font-size:10px;color:var(--text3);margin-top:4px;">Added by: ${exp.createdByName}</div>` : ''}
+        </div>
+        <div style="text-align:right;">
+          <div style="font-weight:800;font-size:16px;color:var(--danger);">₹${parseFloat(exp.amount).toFixed(2)}</div>
+          <div style="margin-top:6px;display:flex;gap:4px;">
+            <button onclick="event.stopPropagation();editExpense('${exp.id}')" 
+              class="btn btn-sm" style="padding:4px 8px;font-size:11px;">✏️</button>
+            <button onclick="event.stopPropagation();deleteExpense('${exp.id}')" 
+              class="btn btn-sm btn-danger" style="padding:4px 8px;font-size:11px;">🗑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+  
+  container.innerHTML = html;
+}
+
+function showAddExpenseForm() {
+  closePopup();
+  
+  const html = `
+    <div class="field">
+      <label>Date *</label>
+      <input type="date" id="exp_date" value="${new Date().toISOString().split('T')[0]}" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Category *</label>
+      <select id="exp_category" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
+        <option value="Salary">👨‍💼 Salary</option>
+        <option value="Electricity">⚡ Electricity</option>
+        <option value="Water">💧 Water</option>
+        <option value="Rent">🏠 Rent</option>
+        <option value="Internet">🌐 Internet</option>
+        <option value="Stationary">📝 Stationary</option>
+        <option value="Maintenance">🔧 Maintenance</option>
+        <option value="Marketing">📢 Marketing</option>
+        <option value="Transport">🚗 Transport</option>
+        <option value="Other">💳 Other</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Amount (₹) *</label>
+      <input type="number" id="exp_amount" placeholder="e.g., 5000" step="0.01" min="0" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <textarea id="exp_description" placeholder="Optional details..." style="width:100%;min-height:70px;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;resize:vertical;"></textarea>
+    </div>
+  `;
+  
+  showPopup('💰', 'Add Expense', 'Record a new expense', html, [
+    { label:'Add Expense', cls:'btn-primary', action:'saveNewExpense()' },
+    { label:'Cancel', cls:'btn-secondary', action:'closePopup();showExpenseManager()' }
+  ]);
+  
+  setTimeout(() => document.getElementById('exp_amount')?.focus(), 100);
+}
+
+function saveNewExpense() {
+  const date = document.getElementById('exp_date').value;
+  const category = document.getElementById('exp_category').value;
+  const amount = parseFloat(document.getElementById('exp_amount').value);
+  const description = document.getElementById('exp_description').value.trim();
+  
+  if (!date) {
+    showToast('Please select date', 'error');
+    return;
+  }
+  
+  if (!category) {
+    showToast('Please select category', 'error');
+    return;
+  }
+  
+  if (!amount || amount <= 0) {
+    showToast('Please enter valid amount', 'error');
+    return;
+  }
+  
+  const expenses = DB.get('expenses') || [];
+  
+  const newExpense = {
+    id: 'exp_' + Date.now(),
+    date,
+    category,
+    amount,
+    description,
+    createdAt: new Date().toISOString(),
+    createdBy: currentUser.id,
+    createdByName: currentUser.name
+  };
+  
+  expenses.push(newExpense);
+  DB.set('expenses', expenses);
+  
+  showToast('Expense added successfully! ✅', 'success');
+  closePopup();
+  showExpenseManager();
+}
+
+function editExpense(expenseId) {
+  const expenses = DB.get('expenses') || [];
+  const expense = expenses.find(e => e.id === expenseId);
+  if (!expense) return;
+  
+  closePopup();
+  
+  const html = `
+    <div class="field">
+      <label>Date *</label>
+      <input type="date" id="exp_date" value="${expense.date}" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Category *</label>
+      <select id="exp_category" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
+        <option value="Salary" ${expense.category==='Salary'?'selected':''}>👨‍💼 Salary</option>
+        <option value="Electricity" ${expense.category==='Electricity'?'selected':''}>⚡ Electricity</option>
+        <option value="Water" ${expense.category==='Water'?'selected':''}>💧 Water</option>
+        <option value="Rent" ${expense.category==='Rent'?'selected':''}>🏠 Rent</option>
+        <option value="Internet" ${expense.category==='Internet'?'selected':''}>🌐 Internet</option>
+        <option value="Stationary" ${expense.category==='Stationary'?'selected':''}>📝 Stationary</option>
+        <option value="Maintenance" ${expense.category==='Maintenance'?'selected':''}>🔧 Maintenance</option>
+        <option value="Marketing" ${expense.category==='Marketing'?'selected':''}>📢 Marketing</option>
+        <option value="Transport" ${expense.category==='Transport'?'selected':''}>🚗 Transport</option>
+        <option value="Other" ${expense.category==='Other'?'selected':''}>💳 Other</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Amount (₹) *</label>
+      <input type="number" id="exp_amount" value="${expense.amount}" step="0.01" min="0" style="width:100%;">
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <textarea id="exp_description" style="width:100%;min-height:70px;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;resize:vertical;">${expense.description||''}</textarea>
+    </div>
+  `;
+  
+  showPopup('✏️', 'Edit Expense', 'Update expense details', html, [
+    { label:'Update', cls:'btn-primary', action:`updateExpense('${expenseId}')` },
+    { label:'Cancel', cls:'btn-secondary', action:'closePopup();showExpenseManager()' }
+  ]);
+}
+
+function updateExpense(expenseId) {
+  const expenses = DB.get('expenses') || [];
+  const expense = expenses.find(e => e.id === expenseId);
+  if (!expense) return;
+  
+  const date = document.getElementById('exp_date').value;
+  const category = document.getElementById('exp_category').value;
+  const amount = parseFloat(document.getElementById('exp_amount').value);
+  const description = document.getElementById('exp_description').value.trim();
+  
+  if (!date || !category || !amount || amount <= 0) {
+    showToast('Please fill all required fields', 'error');
+    return;
+  }
+  
+  expense.date = date;
+  expense.category = category;
+  expense.amount = amount;
+  expense.description = description;
+  expense.updatedAt = new Date().toISOString();
+  expense.updatedBy = currentUser.id;
+  expense.updatedByName = currentUser.name;
+  
+  DB.set('expenses', expenses);
+  showToast('Expense updated! ✅', 'success');
+  closePopup();
+  showExpenseManager();
+}
+
+function deleteExpense(expenseId) {
+  showConfirm('Delete Expense', 'Are you sure you want to delete this expense?', '🗑️', () => {
+    const expenses = DB.get('expenses') || [];
+    const filtered = expenses.filter(e => e.id !== expenseId);
+    DB.set('expenses', filtered);
+    showToast('Expense deleted! ✅', 'success');
+    renderExpenseList();
+  });
+}
+
+function downloadExpensesCSV() {
+  const expenses = DB.get('expenses') || [];
+  if (expenses.length === 0) {
+    showToast('No expenses to export', 'error');
+    return;
+  }
+  
+  // Sort by date
+  const sorted = expenses.sort((a, b) => new Date(a.date) - new Date(b.date));
+  
+  // Create CSV content
+  let csv = 'Date,Category,Amount,Description,Added By\n';
+  sorted.forEach(exp => {
+    csv += `"${exp.date}","${exp.category}","${exp.amount}","${(exp.description||'').replace(/"/g, '""')}","${exp.createdByName||''}"\n`;
+  });
+  
+  // Download
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `TurboWash_Expenses_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  window.URL.revokeObjectURL(url);
+  
+  showToast('Expenses exported! 📥', 'success');
+}
+
+// ============================================================
+// PROFIT & LOSS REPORT (Admin Only)
+// ============================================================
+function showProfitLossReport() {
+  closePopup();
+  
+  const html = `
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <button id="plTab_month" class="btn btn-sm" style="flex:1;background:var(--orange);color:white;" onclick="switchPLTab('month')">Month</button>
+        <button id="plTab_year" class="btn btn-sm btn-secondary" style="flex:1;" onclick="switchPLTab('year')">Year</button>
+        <button id="plTab_custom" class="btn btn-sm btn-secondary" style="flex:1;" onclick="switchPLTab('custom')">Custom</button>
+      </div>
+      
+      <div id="plDateFilter" style="margin-bottom:12px;"></div>
+      
+      <div id="plReportContent" style="max-height:500px;overflow-y:auto;"></div>
+    </div>
+  `;
+  
+  showPopup('📊', 'Profit & Loss Report', 'Financial performance analysis', html, [
+    { label:'Close', cls:'btn-secondary', action:'closePopup()' }
+  ], 'xlarge');
+  
+  currentPLTab = 'month';
+  renderPLReport('month');
+}
+
+let currentPLTab = 'month';
+let currentPLStartDate = null;
+let currentPLEndDate = null;
+
+function switchPLTab(tab) {
+  currentPLTab = tab;
+  
+  // Update button styles
+  document.querySelectorAll('[id^="plTab_"]').forEach(btn => {
+    btn.className = 'btn btn-sm btn-secondary';
+    btn.style.flex = '1';
+  });
+  document.getElementById('plTab_' + tab).className = 'btn btn-sm';
+  document.getElementById('plTab_' + tab).style.background = 'var(--orange)';
+  document.getElementById('plTab_' + tab).style.color = 'white';
+  
+  renderPLReport(tab);
+}
+
+function renderPLReport(period) {
+  const now = new Date();
+  let startDate, endDate, label;
+  
+  if (period === 'month') {
+    // Current month
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    label = `${startDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}`;
+    
+    // Show date filter (month/year selector)
+    document.getElementById('plDateFilter').innerHTML = `
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button onclick="changePLMonth(-1)" class="btn btn-sm">‹</button>
+        <div style="flex:1;text-align:center;font-weight:700;font-size:14px;">${label}</div>
+        <button onclick="changePLMonth(1)" class="btn btn-sm">›</button>
+      </div>
+    `;
+  } else if (period === 'year') {
+    // Current year
+    startDate = new Date(now.getFullYear(), 0, 1);
+    endDate = new Date(now.getFullYear(), 11, 31);
+    label = `${now.getFullYear()}`;
+    
+    document.getElementById('plDateFilter').innerHTML = `
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button onclick="changePLYear(-1)" class="btn btn-sm">‹</button>
+        <div style="flex:1;text-align:center;font-weight:700;font-size:14px;">${label}</div>
+        <button onclick="changePLYear(1)" class="btn btn-sm">›</button>
+      </div>
+    `;
+  } else {
+    // Custom range
+    if (!currentPLStartDate || !currentPLEndDate) {
+      // Default to current month
+      currentPLStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      currentPLEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    }
+    
+    document.getElementById('plDateFilter').innerHTML = `
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="date" id="pl_start_date" value="${currentPLStartDate}" onchange="updateCustomPLDates()" 
+          style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
+        <span style="font-weight:700;">to</span>
+        <input type="date" id="pl_end_date" value="${currentPLEndDate}" onchange="updateCustomPLDates()" 
+          style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
+      </div>
+    `;
+    
+    startDate = new Date(currentPLStartDate);
+    endDate = new Date(currentPLEndDate);
+    label = `${formatDate(currentPLStartDate)} to ${formatDate(currentPLEndDate)}`;
+  }
+  
+  // Calculate P&L
+  const plData = calculatePL(startDate, endDate);
+  
+  // Render report
+  const content = document.getElementById('plReportContent');
+  if (!content) return;
+  
+  content.innerHTML = `
+    <div style="background:linear-gradient(135deg,var(--orange),var(--yellow));border-radius:12px;padding:16px;color:white;margin-bottom:16px;">
+      <div style="font-size:13px;opacity:0.9;margin-bottom:4px;">Net Profit</div>
+      <div style="font-size:28px;font-weight:900;font-family:'Nunito',sans-serif;">${plData.profit >= 0 ? '₹' + plData.profit.toFixed(2) : '-₹' + Math.abs(plData.profit).toFixed(2)}</div>
+      <div style="font-size:12px;opacity:0.8;margin-top:4px;">
+        Profit Margin: ${plData.revenue > 0 ? ((plData.profit / plData.revenue) * 100).toFixed(1) + '%' : '0%'}
+      </div>
+    </div>
+    
+    <div style="background:white;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+      <div style="font-weight:700;margin-bottom:12px;color:var(--orange);">💰 Revenue</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:13px;color:var(--text2);">Total Orders</span>
+        <span style="font-weight:700;">${plData.orderCount}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:13px;color:var(--text2);">Total Revenue</span>
+        <span style="font-weight:800;color:var(--success);font-size:16px;">₹${plData.revenue.toFixed(2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <span style="font-size:13px;color:var(--text2);">Average per Order</span>
+        <span style="font-weight:700;">₹${plData.orderCount > 0 ? (plData.revenue / plData.orderCount).toFixed(2) : '0.00'}</span>
+      </div>
+    </div>
+    
+    <div style="background:white;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+      <div style="font-weight:700;margin-bottom:12px;color:var(--danger);">📊 Expenses</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border);">
+        <span style="font-size:13px;color:var(--text2);">Total Expenses</span>
+        <span style="font-weight:800;color:var(--danger);font-size:16px;">₹${plData.totalExpenses.toFixed(2)}</span>
+      </div>
+      ${plData.expenseBreakdown.map(cat => `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:600;">${getCategoryIcon(cat.category)} ${cat.category}</div>
+            <div style="width:100%;height:4px;background:rgba(244,67,54,0.1);border-radius:2px;margin-top:4px;">
+              <div style="width:${plData.totalExpenses > 0 ? (cat.amount / plData.totalExpenses * 100) : 0}%;height:100%;background:var(--danger);border-radius:2px;"></div>
+            </div>
+          </div>
+          <div style="margin-left:12px;font-weight:700;color:var(--danger);">₹${cat.amount.toFixed(2)}</div>
+        </div>
+      `).join('')}
+    </div>
+    
+    <div style="background:white;border:1px solid var(--border);border-radius:12px;padding:16px;">
+      <div style="font-weight:700;margin-bottom:12px;">📈 Summary</div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+        <span style="font-weight:600;">Revenue</span>
+        <span style="font-weight:700;color:var(--success);">₹${plData.revenue.toFixed(2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+        <span style="font-weight:600;">Expenses</span>
+        <span style="font-weight:700;color:var(--danger);">₹${plData.totalExpenses.toFixed(2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:12px 0;background:${plData.profit >= 0 ? 'rgba(76,175,80,0.1)' : 'rgba(244,67,54,0.1)'};margin:-16px;margin-top:8px;padding:16px;border-radius:0 0 12px 12px;">
+        <span style="font-weight:800;font-size:15px;">${plData.profit >= 0 ? 'Net Profit' : 'Net Loss'}</span>
+        <span style="font-weight:900;font-size:18px;color:${plData.profit >= 0 ? 'var(--success)' : 'var(--danger)'};">${plData.profit >= 0 ? '₹' + plData.profit.toFixed(2) : '-₹' + Math.abs(plData.profit).toFixed(2)}</span>
+      </div>
+    </div>
+  `;
+}
+
+let currentPLMonth = new Date().getMonth();
+let currentPLYear = new Date().getFullYear();
+
+function changePLMonth(delta) {
+  currentPLMonth += delta;
+  if (currentPLMonth < 0) {
+    currentPLMonth = 11;
+    currentPLYear--;
+  } else if (currentPLMonth > 11) {
+    currentPLMonth = 0;
+    currentPLYear++;
+  }
+  
+  const startDate = new Date(currentPLYear, currentPLMonth, 1);
+  const endDate = new Date(currentPLYear, currentPLMonth + 1, 0);
+  const label = startDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  
+  document.getElementById('plDateFilter').innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button onclick="changePLMonth(-1)" class="btn btn-sm">‹</button>
+      <div style="flex:1;text-align:center;font-weight:700;font-size:14px;">${label}</div>
+      <button onclick="changePLMonth(1)" class="btn btn-sm">›</button>
+    </div>
+  `;
+  
+  const plData = calculatePL(startDate, endDate);
+  updatePLContent(plData);
+}
+
+function changePLYear(delta) {
+  currentPLYear += delta;
+  
+  const startDate = new Date(currentPLYear, 0, 1);
+  const endDate = new Date(currentPLYear, 11, 31);
+  
+  document.getElementById('plDateFilter').innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button onclick="changePLYear(-1)" class="btn btn-sm">‹</button>
+      <div style="flex:1;text-align:center;font-weight:700;font-size:14px;">${currentPLYear}</div>
+      <button onclick="changePLYear(1)" class="btn btn-sm">›</button>
+    </div>
+  `;
+  
+  const plData = calculatePL(startDate, endDate);
+  updatePLContent(plData);
+}
+
+function updateCustomPLDates() {
+  currentPLStartDate = document.getElementById('pl_start_date').value;
+  currentPLEndDate = document.getElementById('pl_end_date').value;
+  
+  if (!currentPLStartDate || !currentPLEndDate) return;
+  
+  const startDate = new Date(currentPLStartDate);
+  const endDate = new Date(currentPLEndDate);
+  
+  if (startDate > endDate) {
+    showToast('Start date must be before end date', 'error');
+    return;
+  }
+  
+  const plData = calculatePL(startDate, endDate);
+  updatePLContent(plData);
+}
+
+function updatePLContent(plData) {
+  const content = document.getElementById('plReportContent');
+  if (!content) return;
+  
+  content.innerHTML = `
+    <div style="background:linear-gradient(135deg,var(--orange),var(--yellow));border-radius:12px;padding:16px;color:white;margin-bottom:16px;">
+      <div style="font-size:13px;opacity:0.9;margin-bottom:4px;">Net Profit</div>
+      <div style="font-size:28px;font-weight:900;font-family:'Nunito',sans-serif;">${plData.profit >= 0 ? '₹' + plData.profit.toFixed(2) : '-₹' + Math.abs(plData.profit).toFixed(2)}</div>
+      <div style="font-size:12px;opacity:0.8;margin-top:4px;">
+        Profit Margin: ${plData.revenue > 0 ? ((plData.profit / plData.revenue) * 100).toFixed(1) + '%' : '0%'}
+      </div>
+    </div>
+    
+    <div style="background:white;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+      <div style="font-weight:700;margin-bottom:12px;color:var(--orange);">💰 Revenue</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:13px;color:var(--text2);">Total Orders</span>
+        <span style="font-weight:700;">${plData.orderCount}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:13px;color:var(--text2);">Total Revenue</span>
+        <span style="font-weight:800;color:var(--success);font-size:16px;">₹${plData.revenue.toFixed(2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <span style="font-size:13px;color:var(--text2);">Average per Order</span>
+        <span style="font-weight:700;">₹${plData.orderCount > 0 ? (plData.revenue / plData.orderCount).toFixed(2) : '0.00'}</span>
+      </div>
+    </div>
+    
+    <div style="background:white;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+      <div style="font-weight:700;margin-bottom:12px;color:var(--danger);">📊 Expenses</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border);">
+        <span style="font-size:13px;color:var(--text2);">Total Expenses</span>
+        <span style="font-weight:800;color:var(--danger);font-size:16px;">₹${plData.totalExpenses.toFixed(2)}</span>
+      </div>
+      ${plData.expenseBreakdown.map(cat => `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:600;">${getCategoryIcon(cat.category)} ${cat.category}</div>
+            <div style="width:100%;height:4px;background:rgba(244,67,54,0.1);border-radius:2px;margin-top:4px;">
+              <div style="width:${plData.totalExpenses > 0 ? (cat.amount / plData.totalExpenses * 100) : 0}%;height:100%;background:var(--danger);border-radius:2px;"></div>
+            </div>
+          </div>
+          <div style="margin-left:12px;font-weight:700;color:var(--danger);">₹${cat.amount.toFixed(2)}</div>
+        </div>
+      `).join('')}
+    </div>
+    
+    <div style="background:white;border:1px solid var(--border);border-radius:12px;padding:16px;">
+      <div style="font-weight:700;margin-bottom:12px;">📈 Summary</div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+        <span style="font-weight:600;">Revenue</span>
+        <span style="font-weight:700;color:var(--success);">₹${plData.revenue.toFixed(2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+        <span style="font-weight:600;">Expenses</span>
+        <span style="font-weight:700;color:var(--danger);">₹${plData.totalExpenses.toFixed(2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:12px 0;background:${plData.profit >= 0 ? 'rgba(76,175,80,0.1)' : 'rgba(244,67,54,0.1)'};margin:-16px;margin-top:8px;padding:16px;border-radius:0 0 12px 12px;">
+        <span style="font-weight:800;font-size:15px;">${plData.profit >= 0 ? 'Net Profit' : 'Net Loss'}</span>
+        <span style="font-weight:900;font-size:18px;color:${plData.profit >= 0 ? 'var(--success)' : 'var(--danger)'};">${plData.profit >= 0 ? '₹' + plData.profit.toFixed(2) : '-₹' + Math.abs(plData.profit).toFixed(2)}</span>
+      </div>
+    </div>
+  `;
+}
+
+function calculatePL(startDate, endDate) {
+  const orders = DB.get('orders') || [];
+  const expenses = DB.get('expenses') || [];
+  
+  // Filter orders: only paid_delivered in date range
+  const relevantOrders = orders.filter(o => {
+    if (o.status !== 'paid_delivered') return false;
+    const orderDate = new Date(o.orderDate || o.createdAt);
+    return orderDate >= startDate && orderDate <= endDate;
+  });
+  
+  // Calculate revenue
+  const revenue = relevantOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
+  const orderCount = relevantOrders.length;
+  
+  // Filter expenses in date range
+  const relevantExpenses = expenses.filter(e => {
+    const expDate = new Date(e.date);
+    return expDate >= startDate && expDate <= endDate;
+  });
+  
+  // Calculate total expenses
+  const totalExpenses = relevantExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  
+  // Expense breakdown by category
+  const expensesByCategory = {};
+  relevantExpenses.forEach(e => {
+    if (!expensesByCategory[e.category]) {
+      expensesByCategory[e.category] = 0;
+    }
+    expensesByCategory[e.category] += e.amount;
+  });
+  
+  const expenseBreakdown = Object.entries(expensesByCategory)
+    .map(([category, amount]) => ({ category, amount }))
+    .sort((a, b) => b.amount - a.amount);
+  
+  // Calculate profit
+  const profit = revenue - totalExpenses;
+  
+  return {
+    revenue,
+    orderCount,
+    totalExpenses,
+    expenseBreakdown,
+    profit
+  };
 }
 
 // ============================================================
