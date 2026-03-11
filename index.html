@@ -3601,38 +3601,78 @@ function showOrderDetail(orderId) {
       ${servicesHtml}
     </div>
 
-    <div style="background:var(--dark);border-radius:12px;padding:14px;margin-bottom:12px;color:white;">
-      <div class="inv-total-row"><span>Total Amount</span><strong>₹${(order.totalAmount||0).toFixed(2)}</strong></div>
-      <div class="inv-total-row"><span>Advance Paid</span><strong>₹${(order.paidAmount||0).toFixed(2)}</strong></div>
-      <div class="inv-total-row" style="color:${balance>0?'#ff8a80':'#69f0ae'};font-weight:800;">
-        <span>${balance>0?'Balance Due':'Fully Paid'}</span>
-        <strong>₹${balance.toFixed(2)}</strong>
-      </div>
-      <div style="font-size:11px;opacity:0.6;margin-top:6px;">Mode: ${order.paymentMode==='upi'?'UPI (GPay/PhonePe)':'Cash'}</div>
-    </div>
-
-    ${balance > 0 && isOperatorPlus ? `<div style="margin-bottom:12px;">
-      <div style="font-weight:700;margin-bottom:8px;color:var(--text2);font-size:12px;text-transform:uppercase;">💰 Collect Payment</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <div style="display:flex;gap:8px;align-items:center;">
-          <div style="flex:1;">
-            <label style="font-size:10px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px;">AMOUNT (₹)</label>
-            <input type="number" id="collectAmount" value="${balance.toFixed(2)}" min="0" step="0.01"
-              style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;font-weight:700;outline:none;">
-          </div>
-          <div>
-            <label style="font-size:10px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px;">MODE</label>
-            <select id="collectMode" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;">
-              <option value="cash">💵 Cash</option>
-              <option value="upi">📱 UPI</option>
-            </select>
-          </div>
+    ${(() => {
+      const previousUnpaidOrders = getCustomerPreviousUnpaidOrders(order);
+      const previousBalance = getCustomerPreviousBalance(order);
+      const grandTotal = balance + previousBalance;
+      
+      return `<div style="background:var(--dark);border-radius:12px;padding:14px;margin-bottom:12px;color:white;">
+        <div class="inv-total-row"><span>Total Amount</span><strong>₹${(order.totalAmount||0).toFixed(2)}</strong></div>
+        <div class="inv-total-row"><span>Advance Paid</span><strong>₹${(order.paidAmount||0).toFixed(2)}</strong></div>
+        <div class="inv-total-row" style="color:${balance>0?'#ff8a80':'#69f0ae'};font-weight:800;">
+          <span>${balance>0?'Balance Due':'Fully Paid'}</span>
+          <strong>₹${balance.toFixed(2)}</strong>
         </div>
-        <button class="btn btn-success btn-full" onclick="collectPayment('${order.id}')">
-          💰 Collect Payment
-        </button>
-      </div>
-    </div>` : ''}
+        ${previousBalance > 0 ? `
+          <div style="border-top:1px dashed rgba(255,255,255,0.3);margin:10px 0;padding-top:10px;">
+            <div class="inv-total-row" style="color:#FFE082;">
+              <span>Previous Balance</span>
+              <strong>₹${previousBalance.toFixed(2)}</strong>
+            </div>
+            ${previousUnpaidOrders.length > 0 ? `
+              <div style="margin-top:8px;font-size:11px;opacity:0.9;">
+                <div style="margin-bottom:4px;font-weight:600;">Previous Unpaid Orders:</div>
+                ${previousUnpaidOrders.map(po => {
+                  const poBal = (po.totalAmount||0) - (po.paidAmount||0);
+                  return `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.1);">
+                    <span style="cursor:pointer;color:#81D4FA;text-decoration:underline;" onclick="closeModal('orderDetailModal');setTimeout(()=>showOrderDetail('${po.id}'),100);">
+                      ${po.orderNo} ›
+                    </span>
+                    <span>₹${poBal.toFixed(0)}</span>
+                  </div>`;
+                }).join('')}
+              </div>
+            ` : ''}
+            <div class="inv-total-row" style="color:#FF5252;font-weight:900;font-size:16px;margin-top:10px;padding-top:10px;border-top:2px solid rgba(255,255,255,0.3);">
+              <span>Grand Total Due</span>
+              <strong>₹${grandTotal.toFixed(2)}</strong>
+            </div>
+          </div>
+        ` : ''}
+        <div style="font-size:11px;opacity:0.6;margin-top:6px;">Mode: ${order.paymentMode==='upi'?'UPI (GPay/PhonePe)':'Cash'}</div>
+      </div>`;
+    })()}
+
+    ${(() => {
+      const previousBalance = getCustomerPreviousBalance(order);
+      const grandTotal = balance + previousBalance;
+      
+      return balance > 0 && isOperatorPlus ? `<div style="margin-bottom:12px;">
+        <div style="font-weight:700;margin-bottom:8px;color:var(--text2);font-size:12px;text-transform:uppercase;">💰 Collect Payment</div>
+        ${previousBalance > 0 ? `<div style="background:rgba(255,193,7,0.1);border:1px solid rgba(255,193,7,0.3);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:12px;color:var(--text);">
+          💡 <strong>Note:</strong> This customer has ₹${previousBalance.toFixed(0)} previous balance. Grand total: ₹${grandTotal.toFixed(0)}
+        </div>` : ''}
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div style="flex:1;">
+              <label style="font-size:10px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px;">AMOUNT (₹)</label>
+              <input type="number" id="collectAmount" value="${balance.toFixed(2)}" min="0" step="0.01"
+                style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;font-weight:700;outline:none;">
+            </div>
+            <div>
+              <label style="font-size:10px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px;">MODE</label>
+              <select id="collectMode" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;">
+                <option value="cash">💵 Cash</option>
+                <option value="upi">📱 UPI</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-success btn-full" onclick="collectPayment('${order.id}')">
+            💰 Collect Payment
+          </button>
+        </div>
+      </div>` : '';
+    })()}
 
     ${isOperatorPlus ? `<div style="margin-bottom:12px;">
       <div style="font-weight:700;margin-bottom:8px;color:var(--text2);font-size:12px;text-transform:uppercase;">Update Status</div>
@@ -3694,10 +3734,59 @@ function showOrderDetail(orderId) {
   openModal('orderDetailModal');
 }
 
+// ============================================================
+// CUSTOMER PREVIOUS BALANCE HELPERS
+// ============================================================
+function getCustomerPreviousUnpaidOrders(currentOrder) {
+  const orders = DB.get('orders') || [];
+  const customerPhone = currentOrder.customerPhone;
+  
+  return orders.filter(o => {
+    // Same customer (by phone)
+    if (o.customerPhone !== customerPhone) return false;
+    
+    // Not the current order
+    if (o.id === currentOrder.id) return false;
+    
+    // Created before current order
+    if (new Date(o.createdAt) >= new Date(currentOrder.createdAt)) return false;
+    
+    // Has unpaid balance
+    const balance = (o.totalAmount || 0) - (o.paidAmount || 0);
+    if (balance <= 0) return false;
+    
+    // Not cancelled
+    if (o.status === 'cancelled') return false;
+    
+    return true;
+  }).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)); // Oldest first
+}
+
+function getCustomerPreviousBalance(currentOrder) {
+  const previousUnpaidOrders = getCustomerPreviousUnpaidOrders(currentOrder);
+  return previousUnpaidOrders.reduce((sum, o) => {
+    const balance = (o.totalAmount || 0) - (o.paidAmount || 0);
+    return sum + balance;
+  }, 0);
+}
+
+// ============================================================
+// ORDER STATUS
+// ============================================================
 function updateOrderStatus(orderId, newStatus) {
   const orders = DB.get('orders') || [];
   const order = orders.find(o => o.id === orderId);
   if (!order) return;
+
+  // VALIDATION: Check for unpaid previous orders before marking as paid_delivered
+  if (newStatus === 'paid_delivered') {
+    const previousUnpaidOrders = getCustomerPreviousUnpaidOrders(order);
+    if (previousUnpaidOrders.length > 0) {
+      const orderLinks = previousUnpaidOrders.map(o => o.orderNo).join(', ');
+      showToast(`⚠️ Cannot mark as Paid & Delivered! Customer has ${previousUnpaidOrders.length} unpaid previous order(s): ${orderLinks}. Please settle previous orders first.`, 'error');
+      return;
+    }
+  }
 
   order.status = newStatus;
   if (!order.statusHistory) order.statusHistory = [];
@@ -3981,15 +4070,28 @@ function showInvoice(orderId) {
         </tr></thead>
         <tbody>${servicesHtml}</tbody>
       </table>
-      <div class="inv-total">
-        <div class="inv-total-row"><span>Subtotal</span><strong>₹${(order.subtotal||0).toFixed(2)}</strong></div>
-        <div class="inv-total-row" style="color:#0277BD;"><span>Total Discount</span><strong>-₹${(order.discount||0).toFixed(2)}</strong></div>
-        <hr style="margin:6px 0;border:none;border-top:1px solid var(--border);">
-        <div class="inv-total-row"><span>Total Amount</span><strong>₹${(order.totalAmount||0).toFixed(2)}</strong></div>
-        <div class="inv-total-row"><span>Advance Paid</span><strong>₹${(order.paidAmount||0).toFixed(2)}</strong></div>
-        <div class="inv-total-row main"><span>${balance>0?'Balance Due':'Amount Paid'}</span><strong>₹${balance>0?balance.toFixed(2):(order.totalAmount||0).toFixed(2)}</strong></div>
-        <div style="font-size:11px;opacity:0.6;margin-top:4px;">Payment Mode: ${order.paymentMode==='upi'?'UPI (GPay/PhonePe)':'Cash'}</div>
-      </div>
+      ${(() => {
+        const previousBalance = getCustomerPreviousBalance(order);
+        const grandTotal = balance + previousBalance;
+        
+        return `<div class="inv-total">
+          <div class="inv-total-row"><span>Subtotal</span><strong>₹${(order.subtotal||0).toFixed(2)}</strong></div>
+          <div class="inv-total-row" style="color:#0277BD;"><span>Total Discount</span><strong>-₹${(order.discount||0).toFixed(2)}</strong></div>
+          <hr style="margin:6px 0;border:none;border-top:1px solid var(--border);">
+          <div class="inv-total-row"><span>Total Amount</span><strong>₹${(order.totalAmount||0).toFixed(2)}</strong></div>
+          <div class="inv-total-row"><span>Advance Paid</span><strong>₹${(order.paidAmount||0).toFixed(2)}</strong></div>
+          <div class="inv-total-row" style="${balance>0?'color:#F44336;':'color:#4CAF50;'}"><span>${balance>0?'Balance Due':'Amount Paid'}</span><strong>₹${balance>0?balance.toFixed(2):(order.totalAmount||0).toFixed(2)}</strong></div>
+          ${previousBalance > 0 ? `
+            <hr style="margin:8px 0;border:none;border-top:1px dashed var(--border);">
+            <div class="inv-total-row" style="color:#FF9800;font-size:13px;"><span>Previous Balance</span><strong>₹${previousBalance.toFixed(2)}</strong></div>
+            <div class="inv-total-row main" style="background:rgba(255,82,82,0.1);padding:8px;border-radius:6px;margin-top:6px;">
+              <span style="font-size:15px;">Grand Total Due</span>
+              <strong style="font-size:17px;color:#F44336;">₹${grandTotal.toFixed(2)}</strong>
+            </div>
+          ` : ''}
+          <div style="font-size:11px;opacity:0.6;margin-top:4px;">Payment Mode: ${order.paymentMode==='upi'?'UPI (GPay/PhonePe)':'Cash'}</div>
+        </div>`;
+      })()}
       ${order.notes ? `<div style="margin-top:10px;padding:10px;background:rgba(255,107,0,0.08);border-radius:8px;font-size:12px;"><strong>Note:</strong> ${order.notes}</div>` : ''}
       <div class="inv-footer">
         <p>Thank you for choosing ${shop.name}! 🙏</p>
@@ -4165,7 +4267,9 @@ function downloadInvoicePDF() {
     y += 6;
 
     // ---- TOTALS BOX ----
-    const totH = order.notes ? 34 : 28;
+    const previousBalance = getCustomerPreviousBalance(order);
+    const grandTotal = balance + previousBalance;
+    const totH = previousBalance > 0 ? (order.notes ? 46 : 40) : (order.notes ? 34 : 28);
     doc.setFillColor(26, 26, 46);
     doc.roundedRect(margin, y, cw, totH, 3, 3, 'F');
 
@@ -4182,18 +4286,45 @@ function downloadInvoicePDF() {
     doc.setDrawColor(80, 80, 100);
     doc.line(margin+3, y+16, pw-margin-3, y+16);
 
+    let yOffset = 16;
     const balLabel = balance > 0 ? 'Balance Due:' : 'Amount Paid:';
     const balVal = balance > 0 ? balance.toFixed(2) : (order.totalAmount||0).toFixed(2);
-    doc.setTextColor(255, 215, 0);
-    doc.setFontSize(10);
-    doc.text(balLabel, margin+4, y+23);
-    doc.text('Rs.'+balVal, pw-margin-4, y+23, {align:'right'});
+    doc.setTextColor(255, 138, 128);
+    doc.setFontSize(9);
+    doc.text(balLabel, margin+4, y+yOffset+7);
+    doc.text('Rs.'+balVal, pw-margin-4, y+yOffset+7, {align:'right'});
+    yOffset += 7;
+
+    if (previousBalance > 0) {
+      doc.setDrawColor(80, 80, 100);
+      doc.setLineDash([1, 1]);
+      doc.line(margin+3, y+yOffset+2, pw-margin-3, y+yOffset+2);
+      doc.setLineDash([]);
+      yOffset += 4;
+      
+      doc.setTextColor(255, 183, 77);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Previous Balance:', margin+4, y+yOffset+4);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Rs.'+previousBalance.toFixed(2), pw-margin-4, y+yOffset+4, {align:'right'});
+      yOffset += 6;
+      
+      doc.setTextColor(255, 82, 82);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Grand Total Due:', margin+4, y+yOffset+4);
+      doc.text('Rs.'+grandTotal.toFixed(2), pw-margin-4, y+yOffset+4, {align:'right'});
+      yOffset += 6;
+    } else {
+      yOffset += 1;
+    }
 
     if (order.notes) {
       doc.setTextColor(200, 200, 200);
       doc.setFontSize(7);
       doc.setFont('helvetica', 'normal');
-      doc.text('Note: ' + order.notes, margin+4, y+29, {maxWidth: cw-8});
+      doc.text('Note: ' + order.notes, margin+4, y+yOffset+4, {maxWidth: cw-8});
     }
 
     y += totH + 4;
