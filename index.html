@@ -818,11 +818,13 @@ input[type="number"] {
               <div class="s-info"><div class="s-title">Profit & Loss Report</div><div class="s-sub">Income, expenses & profitability</div></div>
               <span class="s-arrow">›</span>
             </div>
+            <!-- AI Order Entry - DISABLED FOR NOW (will improve later)
             <div class="settings-item operator-plus" onclick="showAIOrderEntry()">
               <span class="s-icon">📸</span>
               <div class="s-info"><div class="s-title">New order using AI</div><div class="s-sub">Scan notebook & extract entries</div></div>
               <span class="s-arrow">›</span>
             </div>
+            -->
           </div>
           <div class="settings-group">
             <div class="settings-group-title">👥 User Management</div>
@@ -1220,6 +1222,7 @@ async function manualSync() {
     // STEP 3: Refresh UI
     if (typeof renderOrders === 'function') renderOrders();
     if (typeof renderDueDatePage === 'function') renderDueDatePage();
+    if (typeof renderDueDateNew === 'function') renderDueDateNew();
     if (typeof refreshDashboard === 'function') refreshDashboard();
     if (typeof renderCustomers === 'function') renderCustomers();
     
@@ -1275,6 +1278,7 @@ async function pullFromCloud() {
       // Refresh UI instead of reload
       if (typeof renderOrders === 'function') renderOrders();
       if (typeof renderDueDatePage === 'function') renderDueDatePage();
+      if (typeof renderDueDateNew === 'function') renderDueDateNew();
       if (typeof refreshDashboard === 'function') refreshDashboard();
     }
   } catch(e) { 
@@ -1317,6 +1321,7 @@ if (typeof firebase !== 'undefined') {
         if (needsRefresh) {
           if (typeof renderOrders === 'function') renderOrders();
           if (typeof renderDueDatePage === 'function') renderDueDatePage();
+          if (typeof renderDueDateNew === 'function') renderDueDateNew();
           if (typeof refreshDashboard === 'function') refreshDashboard();
           if (typeof renderCustomers === 'function') renderCustomers();
           // Toast removed - silent background sync
@@ -3654,6 +3659,8 @@ function saveOrder() {
   renderOrders();
   renderCustomers();
   refreshDashboard();
+  renderDueDatePage();
+  renderDueDateNew();
   serviceItemsData = {};
 }
 
@@ -4003,6 +4010,7 @@ function updateOrderStatus(orderId, newStatus) {
   renderOrders();
   refreshDashboard();
   renderDueDatePage();
+  renderDueDateNew();
 
   // Auto WhatsApp for received status (with tracking link) - not for operators
   if (newStatus === 'received' && currentUser.role !== 'operator') {
@@ -4044,6 +4052,8 @@ function collectPayment(orderId) {
   closeModal('orderDetailModal');
   refreshDashboard();
   renderOrders();
+  renderDueDatePage();
+  renderDueDateNew();
 }
 
 function deleteOrder(orderId) {
@@ -4054,6 +4064,8 @@ function deleteOrder(orderId) {
     showToast('Order deleted', 'warning');
     renderOrders();
     refreshDashboard();
+    renderDueDatePage();
+    renderDueDateNew();
   });
 }
 
@@ -4073,6 +4085,7 @@ function quickShareWhatsAppText(orderId) {
   markWhatsAppSent(orderId);
   renderOrders();
   renderDueDatePage();
+  renderDueDateNew();
   refreshDashboard();
 }
 
