@@ -567,7 +567,7 @@ input[type="number"] {
 
   <!-- Top Header -->
   <div class="top-header">
-    <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#FF6B00,#FFD700);display:flex;align-items:center;justify-content:center;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;color:white;flex-shrink:0;">TW</div>
+    <div id="headerLogoContainer" style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#FF6B00,#FFD700);display:flex;align-items:center;justify-content:center;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;color:white;flex-shrink:0;">TW</div>
     <div class="header-title">
       <h1>TurboWash Laundry</h1>
       <p id="headerUserInfo">Loading...</p>
@@ -877,7 +877,7 @@ input[type="number"] {
       <span class="nav-label">Orders</span>
     </button>
     <button class="nav-fab" onclick="showNewOrderModal()" id="fabBtn">＋</button>
-    <button class="nav-item" onclick="switchPage('pageDueDate')" id="nav-pageDueDate">
+    <button class="nav-item" onclick="switchPage('pageDueDateNew')" id="nav-pageDueDateNew">
       <span class="nav-icon">📅</span>
       <span class="nav-label">Due Date</span>
     </button>
@@ -992,6 +992,9 @@ input[type="number"] {
         </button>
         <button class="btn btn-secondary btn-sm" onclick="document.getElementById('customerCSVInput').click()" style="flex:1;">
           📤 Upload CSV
+        </button>
+        <button id="customerContactPickerButton" class="btn btn-secondary btn-sm" onclick="pickContactForCustomer()" style="flex:1;display:none;">
+          📱 Pick from Contacts
         </button>
       </div>
       
@@ -1473,6 +1476,7 @@ function showMainApp() {
   // Set role-based UI
   applyRoleUI();
   updateHeaderInfo();
+  updateHeaderLogo();
   refreshDashboard();
   renderOrders();
   renderCustomers();
@@ -2752,6 +2756,10 @@ function checkContactPickerSupport() {
     if (button) {
       button.style.display = 'block';
     }
+    const customerButton = document.getElementById('customerContactPickerButton');
+    if (customerButton) {
+      customerButton.style.display = 'block';
+    }
   }
 }
 
@@ -2814,6 +2822,93 @@ async function pickFromContacts() {
 
       // Hide suggestions if showing
       document.getElementById('customerSuggestions').style.display = 'none';
+      
+    } else {
+      showToast('No contact selected', 'warning');
+    }
+    
+  } catch (error) {
+    console.error('Contact picker error:', error);
+    
+    // User canceled or error occurred
+    if (error.name === 'AbortError') {
+      // User canceled - don't show error
+      return;
+    }
+    
+    showToast('Could not access contacts', 'error');
+  }
+}
+
+async function pickContactForCustomer() {
+  try {
+    // Check if API is supported
+    if (!('contacts' in navigator)) {
+      showToast('Contact picker not supported on this device', 'error');
+      return;
+    }
+
+    // Request contacts with name and tel properties
+    const contacts = await navigator.contacts.select(
+      ['name', 'tel'],
+      { multiple: false }
+    );
+
+    if (contacts && contacts.length > 0) {
+      const contact = contacts[0];
+      
+      // Get name
+      const name = contact.name && contact.name.length > 0 ? contact.name[0] : '';
+      
+      // Get phone (remove spaces, dashes, parentheses)
+      let phone = '';
+      if (contact.tel && contact.tel.length > 0) {
+        phone = contact.tel[0].replace(/[\s\-\(\)]/g, '');
+        
+        // If phone starts with country code, try to extract 10 digits
+        if (phone.startsWith('+91')) {
+          phone = phone.substring(3); // Remove +91
+        } else if (phone.startsWith('91') && phone.length > 10) {
+          phone = phone.substring(2); // Remove 91
+        }
+        
+        // Take last 10 digits if longer
+        if (phone.length > 10) {
+          phone = phone.slice(-10);
+        }
+      }
+
+      // Validate we have at least name and phone
+      if (!name || !phone) {
+        showToast('Contact must have name and phone number', 'error');
+        return;
+      }
+
+      // Check if customer already exists
+      const customers = DB.get('customers') || [];
+      const exists = customers.find(c => c.phone === phone);
+      
+      if (exists) {
+        showToast(`Customer "${exists.name}" already exists with this number`, 'warning');
+        return;
+      }
+
+      // Add customer directly
+      const newCustomer = {
+        id: 'cust_' + Date.now(),
+        name: name,
+        phone: phone,
+        email: '',
+        address: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      customers.push(newCustomer);
+      DB.set('customers', customers);
+      
+      renderCustomerList();
+      showToast(`Customer "${name}" added! ✅`, 'success');
       
     } else {
       showToast('No contact selected', 'warning');
@@ -4051,6 +4146,9 @@ function showInvoice(orderId) {
     <div class="invoice-preview" id="invoiceContent" style="position:relative;overflow:hidden;">
       ${stampHtml}
       <div class="inv-header">
+        ${shop.logo && shop.logoOptions && shop.logoOptions.invoice ? `
+          <img src="${shop.logo}" style="max-height:80px;max-width:200px;object-fit:contain;margin-bottom:12px;">
+        ` : ''}
         <h2>${shop.name}</h2>
         <p>${shop.address}</p>
         <p>📞 ${shop.phone} | 🕐 ${shop.hours}</p>
@@ -4139,22 +4237,38 @@ function downloadInvoicePDF() {
     const cw = pw - margin * 2;
 
     // ---- HEADER BACKGROUND ----
+    const hasLogo = shop.logo && shop.logoOptions && shop.logoOptions.pdf;
+    const headerHeight = hasLogo ? 50 : 38;
     doc.setFillColor(26, 26, 46);
-    doc.roundedRect(0, 0, pw, 38, 0, 0, 'F');
+    doc.roundedRect(0, 0, pw, headerHeight, 0, 0, 'F');
+
+    // ---- LOGO (if enabled) ----
+    if (hasLogo) {
+      try {
+        // Add logo at top center
+        doc.addImage(shop.logo, 'PNG', pw/2 - 15, 8, 30, 15, undefined, 'FAST');
+        y = 26;
+      } catch (e) {
+        console.log('Could not add logo to PDF:', e);
+        y = 10;
+      }
+    } else {
+      y = 10;
+    }
 
     // ---- SHOP NAME ----
     doc.setTextColor(255, 107, 0);
     doc.setFontSize(13);
     doc.setFont('helvetica', 'bold');
-    doc.text(shop.name || 'TurboWash Laundry', pw/2, 14, {align:'center'});
+    doc.text(shop.name || 'TurboWash Laundry', pw/2, y + 4, {align:'center'});
 
     doc.setTextColor(200, 200, 220);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
-    doc.text(shop.address || '', pw/2, 19, {align:'center', maxWidth:cw});
-    doc.text((shop.phone||'') + '  |  ' + (shop.hours||''), pw/2, 24, {align:'center'});
+    doc.text(shop.address || '', pw/2, y + 9, {align:'center', maxWidth:cw});
+    doc.text((shop.phone||'') + '  |  ' + (shop.hours||''), pw/2, y + 14, {align:'center'});
 
-    y = 42;
+    y = headerHeight + 4;
 
     // ---- ORDER INFO ----
     doc.setFillColor(248, 249, 255);
@@ -5300,31 +5414,156 @@ function saveWhatsAppTemplates() {
 // ============================================================
 function showShopSettings() {
   const shop = DB.get('shopSettings') || {};
+  const logoB64 = shop.logo || '';
+  const logoOptions = shop.logoOptions || { invoice: false, homescreen: false, pdf: false };
+  
   const html = `
     <div class="field"><label>Shop Name</label><input type="text" id="ss_name" value="${shop.name||''}"></div>
     <div class="field"><label>Address</label><textarea id="ss_address" style="min-height:70px;">${shop.address||''}</textarea></div>
     <div class="field"><label>Phone</label><input type="tel" id="ss_phone" value="${shop.phone||''}"></div>
     <div class="field"><label>Working Hours</label><input type="text" id="ss_hours" value="${shop.hours||''}"></div>
-    <div class="field"><label>Order Prefix (e.g. TWL)</label><input type="text" id="ss_prefix" value="${shop.orderPrefix||'TWL'}" maxlength="6" style="text-transform:uppercase;"></div>`;
+    <div class="field"><label>Order Prefix (e.g. TWL)</label><input type="text" id="ss_prefix" value="${shop.orderPrefix||'TWL'}" maxlength="6" style="text-transform:uppercase;"></div>
+    
+    <hr style="margin:20px 0;border:none;border-top:1px solid var(--border);">
+    
+    <div class="field">
+      <label>Shop Logo</label>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        ${logoB64 ? `
+          <div style="background:var(--card2);border-radius:8px;padding:12px;display:flex;align-items:center;gap:10px;">
+            <img src="${logoB64}" style="max-height:60px;max-width:100px;object-fit:contain;border-radius:4px;">
+            <div style="flex:1;">
+              <div style="font-size:11px;color:var(--text3);">Current logo</div>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="removeLogo()">Remove</button>
+          </div>
+        ` : ''}
+        <input type="file" id="ss_logo" accept="image/*" style="padding:8px;border:1px dashed var(--border);border-radius:8px;font-size:12px;" onchange="previewLogo(this)">
+        <div id="logoPreview" style="display:none;background:var(--card2);border-radius:8px;padding:12px;">
+          <img id="logoPreviewImg" style="max-height:80px;max-width:100%;object-fit:contain;">
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">
+          Recommended: PNG or JPG, max 500KB, transparent background works best
+        </div>
+      </div>
+    </div>
+    
+    <div class="field">
+      <label>Display Logo In:</label>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px;border-radius:6px;background:var(--card2);">
+          <input type="checkbox" id="logo_invoice" ${logoOptions.invoice?'checked':''} style="width:18px;height:18px;cursor:pointer;">
+          <div>
+            <div style="font-weight:600;font-size:13px;">📄 Invoice (Print & Screen)</div>
+            <div style="font-size:11px;color:var(--text3);">Show logo at top of invoice</div>
+          </div>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px;border-radius:6px;background:var(--card2);">
+          <input type="checkbox" id="logo_pdf" ${logoOptions.pdf?'checked':''} style="width:18px;height:18px;cursor:pointer;">
+          <div>
+            <div style="font-weight:600;font-size:13px;">📥 PDF Invoice</div>
+            <div style="font-size:11px;color:var(--text3);">Include logo in downloaded PDF</div>
+          </div>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px;border-radius:6px;background:var(--card2);">
+          <input type="checkbox" id="logo_homescreen" ${logoOptions.homescreen?'checked':''} style="width:18px;height:18px;cursor:pointer;">
+          <div>
+            <div style="font-weight:600;font-size:13px;">🏠 Home Screen</div>
+            <div style="font-size:11px;color:var(--text3);">Show logo in app header</div>
+          </div>
+        </label>
+      </div>
+    </div>
+  `;
 
   showPopup('🏪', 'Shop Settings', 'Update your shop information', html, [
     { label:'Save', cls:'btn-primary', action:'saveShopSettings()' },
     { label:'Cancel', cls:'btn-secondary', action:'closePopup()' }
-  ]);
+  ], 'popup-large');
+}
+
+function previewLogo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  
+  // Check file size (max 500KB)
+  if (file.size > 500 * 1024) {
+    showToast('Logo file too large. Please use image under 500KB', 'error');
+    input.value = '';
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const preview = document.getElementById('logoPreview');
+    const img = document.getElementById('logoPreviewImg');
+    img.src = e.target.result;
+    preview.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeLogo() {
+  const shop = DB.get('shopSettings') || {};
+  delete shop.logo;
+  delete shop.logoOptions;
+  DB.set('shopSettings', shop);
+  showToast('Logo removed! ✅', 'success');
+  updateHeaderLogo();
+  closePopup();
+  setTimeout(() => showShopSettings(), 100);
 }
 
 function saveShopSettings() {
+  const logoInput = document.getElementById('ss_logo');
+  const currentShop = DB.get('shopSettings') || {};
+  
   const shop = {
     name: document.getElementById('ss_name').value.trim(),
     address: document.getElementById('ss_address').value.trim(),
     phone: document.getElementById('ss_phone').value.trim(),
     hours: document.getElementById('ss_hours').value.trim(),
-    orderPrefix: document.getElementById('ss_prefix').value.trim().toUpperCase()
+    orderPrefix: document.getElementById('ss_prefix').value.trim().toUpperCase(),
+    logo: currentShop.logo || '', // Keep existing logo
+    logoOptions: {
+      invoice: document.getElementById('logo_invoice').checked,
+      pdf: document.getElementById('logo_pdf').checked,
+      homescreen: document.getElementById('logo_homescreen').checked
+    }
   };
-  DB.set('shopSettings', shop);
-  showToast('Shop settings saved! ✅', 'success');
-  closePopup();
-  refreshDashboard();
+  
+  // If new logo uploaded, save it
+  if (logoInput.files && logoInput.files[0]) {
+    const file = logoInput.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      shop.logo = e.target.result;
+      DB.set('shopSettings', shop);
+      showToast('Shop settings saved! ✅', 'success');
+      updateHeaderLogo();
+      closePopup();
+      refreshDashboard();
+    };
+    reader.readAsDataURL(file);
+  } else {
+    DB.set('shopSettings', shop);
+    showToast('Shop settings saved! ✅', 'success');
+    updateHeaderLogo();
+    closePopup();
+    refreshDashboard();
+  }
+}
+
+function updateHeaderLogo() {
+  const shop = DB.get('shopSettings') || {};
+  const logoOptions = shop.logoOptions || {};
+  const logoContainer = document.getElementById('headerLogoContainer');
+  
+  if (logoContainer && shop.logo && logoOptions.homescreen) {
+    logoContainer.innerHTML = `<img src="${shop.logo}" style="height:36px;width:auto;max-width:120px;object-fit:contain;border-radius:6px;">`;
+  } else if (logoContainer) {
+    logoContainer.innerHTML = `<div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#FF6B00,#FFD700);display:flex;align-items:center;justify-content:center;font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;color:white;flex-shrink:0;">TW</div>`;
+  }
 }
 
 // ============================================================
