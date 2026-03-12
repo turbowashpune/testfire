@@ -509,6 +509,8 @@ input[type="number"] {
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Tesseract.js for OCR -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
   <!-- Firebase SDK for cloud sync -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -816,6 +818,11 @@ input[type="number"] {
               <div class="s-info"><div class="s-title">Profit & Loss Report</div><div class="s-sub">Income, expenses & profitability</div></div>
               <span class="s-arrow">›</span>
             </div>
+            <div class="settings-item operator-plus" onclick="showAIOrderEntry()">
+              <span class="s-icon">📸</span>
+              <div class="s-info"><div class="s-title">New order using AI</div><div class="s-sub">Scan notebook & extract entries</div></div>
+              <span class="s-arrow">›</span>
+            </div>
           </div>
           <div class="settings-group">
             <div class="settings-group-title">👥 User Management</div>
@@ -1011,6 +1018,102 @@ input[type="number"] {
 
 <!-- Hidden file input for import -->
 <input type="file" id="importFileInput" accept=".json" style="display:none" onchange="processImport(event)">
+
+<!-- AI Order Entry Modal -->
+<div class="modal-overlay" id="aiOrderModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h3>📸 New order using AI</h3>
+      <button class="modal-close" onclick="closeModal('aiOrderModal')">✕</button>
+    </div>
+    <div class="modal-body" style="padding:16px;">
+      <!-- Upload Section -->
+      <div id="aiUploadSection">
+        <div style="background:linear-gradient(135deg,#FF6B00,#FFB300);border-radius:12px;padding:20px;text-align:center;margin-bottom:16px;">
+          <div style="font-size:48px;margin-bottom:12px;">📸</div>
+          <h3 style="color:white;margin:0 0 8px 0;">Scan Your Notebook</h3>
+          <p style="color:rgba(255,255,255,0.9);font-size:13px;margin:0;">Take a photo of your notebook page and let AI extract all entries</p>
+        </div>
+
+        <!-- Photo Upload -->
+        <div style="background:var(--card2);border-radius:12px;padding:16px;margin-bottom:16px;">
+          <label style="font-weight:700;font-size:13px;color:var(--text2);display:block;margin-bottom:8px;">UPLOAD PHOTO</label>
+          <input type="file" id="aiPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoUpload(event)">
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary btn-full" onclick="document.getElementById('aiPhotoInput').click()">
+              📷 Take Photo / Upload
+            </button>
+          </div>
+        </div>
+
+        <!-- Preview -->
+        <div id="aiPhotoPreview" style="display:none;background:var(--card2);border-radius:12px;padding:16px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <label style="font-weight:700;font-size:13px;color:var(--text2);">PREVIEW</label>
+            <button class="btn btn-danger btn-sm" onclick="clearAIPhoto()">🗑 Remove</button>
+          </div>
+          <img id="aiPhotoPreviewImg" style="max-width:100%;border-radius:8px;border:2px solid var(--border);">
+        </div>
+
+        <!-- Tips -->
+        <div style="background:rgba(255,107,0,0.1);border:1px solid rgba(255,107,0,0.3);border-radius:10px;padding:12px;margin-bottom:16px;">
+          <div style="font-weight:700;font-size:12px;color:var(--orange);margin-bottom:6px;">💡 Tips for Best Results:</div>
+          <ul style="margin:0;padding-left:20px;font-size:12px;color:var(--text2);line-height:1.6;">
+            <li>Use good lighting (avoid shadows)</li>
+            <li>Keep page flat (no curled edges)</li>
+            <li>Write clearly in block letters</li>
+            <li>Format: ID | Name | Phone | Service</li>
+            <li>Example: ID-001 Raj 9876543210 2 Shirt DC</li>
+          </ul>
+        </div>
+
+        <!-- Process Button -->
+        <button id="aiProcessBtn" class="btn btn-success btn-full" onclick="processNotebookOCR()" disabled style="font-size:15px;padding:14px;">
+          🔍 Process & Extract Entries
+        </button>
+      </div>
+
+      <!-- Processing Section -->
+      <div id="aiProcessingSection" style="display:none;text-align:center;padding:40px 20px;">
+        <div class="spinner" style="margin:0 auto 20px;"></div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:8px;" id="aiProcessStatus">Processing image...</div>
+        <div style="font-size:12px;color:var(--text3);" id="aiProcessDetail">This may take 10-30 seconds</div>
+      </div>
+
+      <!-- Results Section -->
+      <div id="aiResultsSection" style="display:none;">
+        <div style="background:var(--card2);border-radius:12px;padding:14px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-weight:700;font-size:15px;">📋 Extracted Entries</div>
+              <div style="font-size:12px;color:var(--text3);" id="aiEntryCount">0 entries found</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="backToUpload()">⬅ Back</button>
+          </div>
+        </div>
+
+        <!-- Entries List -->
+        <div id="aiEntriesList" style="max-height:450px;overflow-y:auto;margin-bottom:16px;">
+          <!-- Entries will be dynamically inserted here -->
+        </div>
+
+        <!-- Bulk Actions -->
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary btn-full" onclick="saveAllAIEntries(false)" style="flex:1;">
+            💾 Save All Entries
+          </button>
+          <button class="btn btn-success btn-full" onclick="saveAllAIEntries(true)" style="flex:1;">
+            💾📱 Save & WhatsApp
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden photo input -->
+<input type="file" id="aiPhotoInput" accept="image/*" style="display:none" onchange="handlePhotoUpload(event)">
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
@@ -6238,6 +6341,579 @@ function autoSaveCustomerFromOrder(name, phone) {
   });
   
   DB.set('customers', customers);
+}
+
+// ============================================================
+// AI ORDER ENTRY (OCR)
+// ============================================================
+let aiPhotoData = null;
+let aiExtractedEntries = [];
+
+function showAIOrderEntry() {
+  openModal('aiOrderModal');
+  // Reset to upload section
+  document.getElementById('aiUploadSection').style.display = 'block';
+  document.getElementById('aiProcessingSection').style.display = 'none';
+  document.getElementById('aiResultsSection').style.display = 'none';
+  document.getElementById('aiPhotoPreview').style.display = 'none';
+  document.getElementById('aiProcessBtn').disabled = true;
+  aiPhotoData = null;
+  aiExtractedEntries = [];
+}
+
+function handlePhotoUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  // Check file type
+  if (!file.type.startsWith('image/')) {
+    showToast('Please select an image file', 'error');
+    return;
+  }
+  
+  // Check file size (max 10MB)
+  if (file.size > 10 * 1024 * 1024) {
+    showToast('Image too large. Please use image under 10MB', 'error');
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    aiPhotoData = e.target.result;
+    const preview = document.getElementById('aiPhotoPreview');
+    const img = document.getElementById('aiPhotoPreviewImg');
+    img.src = aiPhotoData;
+    preview.style.display = 'block';
+    document.getElementById('aiProcessBtn').disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearAIPhoto() {
+  aiPhotoData = null;
+  document.getElementById('aiPhotoPreview').style.display = 'none';
+  document.getElementById('aiPhotoInput').value = '';
+  document.getElementById('aiProcessBtn').disabled = true;
+}
+
+function backToUpload() {
+  document.getElementById('aiUploadSection').style.display = 'block';
+  document.getElementById('aiResultsSection').style.display = 'none';
+}
+
+async function processNotebookOCR() {
+  if (!aiPhotoData) {
+    showToast('Please select a photo first', 'error');
+    return;
+  }
+  
+  // Show processing section
+  document.getElementById('aiUploadSection').style.display = 'none';
+  document.getElementById('aiProcessingSection').style.display = 'block';
+  document.getElementById('aiProcessStatus').textContent = 'Processing image...';
+  document.getElementById('aiProcessDetail').textContent = 'This may take 10-30 seconds';
+  
+  try {
+    // Run OCR using Tesseract.js
+    const result = await Tesseract.recognize(
+      aiPhotoData,
+      'eng',
+      {
+        logger: info => {
+          if (info.status === 'recognizing text') {
+            const progress = Math.round(info.progress * 100);
+            document.getElementById('aiProcessStatus').textContent = `Processing... ${progress}%`;
+            document.getElementById('aiProcessDetail').textContent = 'Reading handwriting from image';
+          }
+        }
+      }
+    );
+    
+    document.getElementById('aiProcessStatus').textContent = 'Extracting entries...';
+    document.getElementById('aiProcessDetail').textContent = 'Parsing text and matching patterns';
+    
+    // Extract text
+    const text = result.data.text;
+    console.log('OCR Text:', text);
+    
+    // Parse entries from text
+    const entries = parseNotebookEntries(text);
+    
+    if (entries.length === 0) {
+      showToast('No entries found. Please check the photo and try again.', 'warning');
+      document.getElementById('aiUploadSection').style.display = 'block';
+      document.getElementById('aiProcessingSection').style.display = 'none';
+      return;
+    }
+    
+    // Store extracted entries
+    aiExtractedEntries = entries;
+    
+    // Show results
+    showAIResults();
+    
+  } catch (error) {
+    console.error('OCR Error:', error);
+    showToast('Failed to process image. Please try again.', 'error');
+    document.getElementById('aiUploadSection').style.display = 'block';
+    document.getElementById('aiProcessingSection').style.display = 'none';
+  }
+}
+
+function parseNotebookEntries(text) {
+  const entries = [];
+  const lines = text.split('\n').filter(line => line.trim().length > 5);
+  
+  // Get the last order number to generate sequential IDs
+  const orders = DB.get('orders') || [];
+  let lastOrderNum = 0;
+  if (orders.length > 0) {
+    const lastOrder = orders[orders.length - 1];
+    const match = lastOrder.orderNo.match(/(\d+)$/);
+    if (match) lastOrderNum = parseInt(match[1]);
+  }
+  
+  let entryCounter = 0;
+  
+  for (let line of lines) {
+    // Clean the line
+    line = line.trim().replace(/\s+/g, ' ');
+    
+    // Skip very short lines
+    if (line.length < 8) continue;
+    
+    // Try to extract: ID (optional) | Name | Phone | Service
+    // Patterns to match:
+    // "ID-001 Raj Kumar 9876543210 2 Shirt DC"
+    // "Raj Kumar 9876543210 2 Shirt DC"
+    // "001 Raj 9876543210 2 Shirt DC"
+    
+    // Extract phone number first (10 digits)
+    const phoneMatch = line.match(/\b(\d{10})\b/);
+    if (!phoneMatch) continue; // Skip if no phone number
+    
+    const phone = phoneMatch[1];
+    const phoneIndex = line.indexOf(phone);
+    
+    // Text before phone is likely ID + Name
+    const beforePhone = line.substring(0, phoneIndex).trim();
+    // Text after phone is likely Service
+    const afterPhone = line.substring(phoneIndex + 10).trim();
+    
+    // Skip ID pattern if present and extract name
+    let name = beforePhone;
+    name = name.replace(/^(ID[-\s]*)?\d+\s*/i, ''); // Remove ID-001 or 001 or ID 001
+    name = name.trim();
+    
+    if (!name || name.length < 2) continue; // Need a name
+    if (!afterPhone || afterPhone.length < 3) continue; // Need a service
+    
+    // Generate sequential order number
+    entryCounter++;
+    const orderNum = lastOrderNum + entryCounter;
+    const shop = DB.get('shopSettings') || {};
+    const prefix = shop.orderPrefix || 'TWL';
+    const orderNo = `${prefix}-${String(orderNum).padStart(3, '0')}`;
+    
+    // Try to match customer by phone
+    const customers = DB.get('customers') || [];
+    const matchedCustomer = customers.find(c => c.phone === phone);
+    
+    // Parse service description
+    const serviceParsed = parseServiceDescription(afterPhone);
+    
+    const entry = {
+      tempId: 'ai_' + Date.now() + '_' + entryCounter,
+      orderNo: orderNo,
+      name: capitalizeWords(name),
+      phone: phone,
+      customerMatched: !!matchedCustomer,
+      matchedCustomer: matchedCustomer,
+      serviceText: afterPhone,
+      serviceParsed: serviceParsed,
+      rawLine: line,
+      confidence: calculateConfidence(name, phone, afterPhone)
+    };
+    
+    entries.push(entry);
+  }
+  
+  return entries;
+}
+
+function parseServiceDescription(text) {
+  // Parse service descriptions like:
+  // "2 Shirt DC" → 2 Shirt Dry Cleaning
+  // "1 Pant + 2 Shirt Iron" → 1 Pant Iron, 2 Shirt Iron
+  // "3 Kurta WW" → 3 Kurta Wash & Iron
+  
+  const services = [];
+  const parts = text.split('+').map(p => p.trim());
+  
+  for (let part of parts) {
+    // Match: "2 Shirt DC" or "1 Pant Iron"
+    const match = part.match(/(\d+)\s+([A-Za-z]+)\s*([A-Za-z]+)?/i);
+    if (match) {
+      const qty = parseInt(match[1]);
+      const item = capitalizeWords(match[2]);
+      const serviceType = match[3] ? match[3].toUpperCase() : 'WI';
+      
+      // Map service codes
+      let serviceName = 'Wash & Iron';
+      if (serviceType === 'DC' || serviceType.includes('DRY')) serviceName = 'Dry Cleaning';
+      else if (serviceType.includes('IRON') || serviceType === 'I') serviceName = 'Iron';
+      else if (serviceType === 'WW' || serviceType.includes('WASH')) serviceName = 'Wash & Iron';
+      
+      services.push({
+        qty: qty,
+        item: item,
+        service: serviceName
+      });
+    }
+  }
+  
+  return services;
+}
+
+function capitalizeWords(str) {
+  return str.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function calculateConfidence(name, phone, service) {
+  let score = 0;
+  
+  // Phone number is 10 digits = high confidence
+  if (phone && phone.length === 10) score += 40;
+  
+  // Name has reasonable length
+  if (name && name.length >= 3 && name.length <= 30) score += 30;
+  
+  // Service has numbers and text
+  if (service && /\d/.test(service) && /[a-zA-Z]/.test(service)) score += 30;
+  
+  return Math.min(100, score);
+}
+
+function showAIResults() {
+  document.getElementById('aiProcessingSection').style.display = 'none';
+  document.getElementById('aiResultsSection').style.display = 'block';
+  
+  const count = aiExtractedEntries.length;
+  document.getElementById('aiEntryCount').textContent = `${count} ${count === 1 ? 'entry' : 'entries'} found`;
+  
+  renderAIEntries();
+}
+
+function renderAIEntries() {
+  const container = document.getElementById('aiEntriesList');
+  
+  if (aiExtractedEntries.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center;padding:40px;color:var(--text3);">
+        <div style="font-size:48px;margin-bottom:12px;">📋</div>
+        <div>No entries extracted</div>
+      </div>`;
+    return;
+  }
+  
+  container.innerHTML = aiExtractedEntries.map((entry, index) => {
+    const confidenceColor = entry.confidence >= 80 ? '#4CAF50' : entry.confidence >= 60 ? '#FF9800' : '#F44336';
+    const confidenceIcon = entry.confidence >= 80 ? '✅' : entry.confidence >= 60 ? '⚠️' : '❌';
+    
+    return `
+      <div style="background:white;border:2px solid ${entry.customerMatched ? '#4CAF50' : 'var(--border)'};border-radius:12px;padding:14px;margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+          <div style="flex:1;">
+            <div style="font-weight:800;font-size:15px;color:var(--orange);font-family:'Nunito',sans-serif;">${entry.orderNo}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px;">
+              ${confidenceIcon} Confidence: ${entry.confidence}%
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-secondary btn-sm" onclick="editAIEntry(${index})">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteAIEntry(${index})">🗑️</button>
+          </div>
+        </div>
+        
+        <div style="background:var(--card2);border-radius:8px;padding:10px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span style="font-weight:700;font-size:13px;">👤 ${entry.name}</span>
+            ${entry.customerMatched ? '<span style="background:#4CAF50;color:white;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700;">✓ MATCHED</span>' : '<span style="background:#FF9800;color:white;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700;">NEW</span>'}
+          </div>
+          <div style="font-size:12px;color:var(--text2);">📞 ${entry.phone}</div>
+          ${entry.matchedCustomer ? `<div style="font-size:11px;color:var(--text3);margin-top:4px;">Known customer: ${entry.matchedCustomer.name}</div>` : ''}
+        </div>
+        
+        <div style="background:rgba(255,107,0,0.05);border-radius:8px;padding:10px;">
+          <div style="font-weight:700;font-size:11px;color:var(--text2);margin-bottom:6px;">SERVICE:</div>
+          ${entry.serviceParsed.length > 0 ? entry.serviceParsed.map(s => 
+            `<div style="font-size:12px;margin-bottom:4px;">• ${s.qty}× ${s.item} - ${s.service}</div>`
+          ).join('') : `<div style="font-size:12px;color:var(--text3);">${entry.serviceText}</div>`}
+        </div>
+        
+        <div style="display:flex;gap:6px;margin-top:10px;">
+          <button class="btn btn-success btn-sm" onclick="saveAIEntry(${index}, false)" style="flex:1;">
+            💾 Save
+          </button>
+          <button class="btn btn-success btn-sm" onclick="saveAIEntry(${index}, true)" style="flex:1;">
+            💾📱 Save & WhatsApp
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function editAIEntry(index) {
+  const entry = aiExtractedEntries[index];
+  
+  const html = `
+    <div class="field">
+      <label>Order Number</label>
+      <input type="text" id="edit_orderNo" value="${entry.orderNo}" readonly style="background:var(--card2);">
+    </div>
+    <div class="field">
+      <label>Customer Name</label>
+      <input type="text" id="edit_name" value="${entry.name}">
+    </div>
+    <div class="field">
+      <label>Phone Number</label>
+      <input type="tel" id="edit_phone" value="${entry.phone}">
+    </div>
+    <div class="field">
+      <label>Service Description</label>
+      <textarea id="edit_service" style="min-height:70px;">${entry.serviceText}</textarea>
+    </div>
+  `;
+  
+  showPopup('✏️', 'Edit Entry', 'Correct any mistakes', html, [
+    { label:'Save Changes', cls:'btn-primary', action:`updateAIEntry(${index})` },
+    { label:'Cancel', cls:'btn-secondary', action:'closePopup()' }
+  ]);
+}
+
+function updateAIEntry(index) {
+  const name = document.getElementById('edit_name').value.trim();
+  const phone = document.getElementById('edit_phone').value.trim();
+  const service = document.getElementById('edit_service').value.trim();
+  
+  if (!name || !phone || !service) {
+    showToast('All fields are required', 'error');
+    return;
+  }
+  
+  if (phone.length !== 10 || !/^\d+$/.test(phone)) {
+    showToast('Phone must be 10 digits', 'error');
+    return;
+  }
+  
+  aiExtractedEntries[index].name = name;
+  aiExtractedEntries[index].phone = phone;
+  aiExtractedEntries[index].serviceText = service;
+  aiExtractedEntries[index].serviceParsed = parseServiceDescription(service);
+  
+  // Re-match customer
+  const customers = DB.get('customers') || [];
+  const matchedCustomer = customers.find(c => c.phone === phone);
+  aiExtractedEntries[index].customerMatched = !!matchedCustomer;
+  aiExtractedEntries[index].matchedCustomer = matchedCustomer;
+  
+  renderAIEntries();
+  closePopup();
+  showToast('Entry updated! ✅', 'success');
+}
+
+function deleteAIEntry(index) {
+  if (confirm('Delete this entry?')) {
+    aiExtractedEntries.splice(index, 1);
+    renderAIEntries();
+    const count = aiExtractedEntries.length;
+    document.getElementById('aiEntryCount').textContent = `${count} ${count === 1 ? 'entry' : 'entries'} found`;
+    showToast('Entry deleted', 'success');
+  }
+}
+
+async function saveAIEntry(index, sendWhatsApp) {
+  const entry = aiExtractedEntries[index];
+  
+  // Create order from entry
+  const success = await createOrderFromAIEntry(entry, sendWhatsApp);
+  
+  if (success) {
+    // Remove from list
+    aiExtractedEntries.splice(index, 1);
+    renderAIEntries();
+    
+    const count = aiExtractedEntries.length;
+    document.getElementById('aiEntryCount').textContent = `${count} ${count === 1 ? 'entry' : 'entries'} found`;
+    
+    if (aiExtractedEntries.length === 0) {
+      showToast('All entries saved! ✅', 'success');
+      setTimeout(() => {
+        closeModal('aiOrderModal');
+        renderOrders();
+        refreshDashboard();
+      }, 1000);
+    }
+  }
+}
+
+async function saveAllAIEntries(sendWhatsApp) {
+  if (aiExtractedEntries.length === 0) {
+    showToast('No entries to save', 'warning');
+    return;
+  }
+  
+  const total = aiExtractedEntries.length;
+  let saved = 0;
+  
+  showToast(`Saving ${total} entries...`, '');
+  
+  for (let i = aiExtractedEntries.length - 1; i >= 0; i--) {
+    const entry = aiExtractedEntries[i];
+    const success = await createOrderFromAIEntry(entry, sendWhatsApp);
+    if (success) {
+      saved++;
+      aiExtractedEntries.splice(i, 1);
+    }
+    // Small delay between orders
+    await new Promise(resolve => setTimeout(resolve, sendWhatsApp ? 1000 : 100));
+  }
+  
+  if (saved === total) {
+    showToast(`All ${total} entries saved! ✅`, 'success');
+    setTimeout(() => {
+      closeModal('aiOrderModal');
+      renderOrders();
+      refreshDashboard();
+    }, 1000);
+  } else {
+    showToast(`Saved ${saved} of ${total} entries`, 'warning');
+    renderAIEntries();
+  }
+}
+
+async function createOrderFromAIEntry(entry, sendWhatsApp) {
+  try {
+    // Check if customer exists, if not create one
+    let customers = DB.get('customers') || [];
+    let customer = customers.find(c => c.phone === entry.phone);
+    
+    if (!customer) {
+      customer = {
+        id: 'cust_' + Date.now(),
+        name: entry.name,
+        phone: entry.phone,
+        email: '',
+        address: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      customers.push(customer);
+      DB.set('customers', customers);
+    }
+    
+    // Build services array
+    const services = [];
+    if (entry.serviceParsed.length > 0) {
+      // Group by service type
+      const serviceGroups = {};
+      entry.serviceParsed.forEach(s => {
+        if (!serviceGroups[s.service]) {
+          serviceGroups[s.service] = [];
+        }
+        serviceGroups[s.service].push({
+          name: s.item,
+          qty: s.qty,
+          price: 0, // Will be filled from service manager
+          discount: 0
+        });
+      });
+      
+      // Get service prices from service manager
+      const allServices = DB.get('services') || [];
+      
+      for (let serviceName in serviceGroups) {
+        const serviceData = allServices.find(s => s.name === serviceName);
+        const items = serviceGroups[serviceName];
+        
+        // Try to match items and get prices
+        if (serviceData && serviceData.items) {
+          items.forEach(item => {
+            const itemData = serviceData.items.find(i => i.name.toLowerCase() === item.name.toLowerCase());
+            if (itemData) {
+              item.price = itemData.price || 0;
+            }
+          });
+        }
+        
+        // Calculate service total
+        const serviceTotal = items.reduce((sum, item) => sum + (item.qty * item.price - item.discount), 0);
+        
+        services.push({
+          serviceName: serviceName,
+          items: items,
+          serviceTotal: serviceTotal
+        });
+      }
+    }
+    
+    // Calculate totals
+    const subtotal = services.reduce((sum, svc) => sum + (svc.serviceTotal || 0), 0);
+    const discount = services.reduce((sum, svc) => 
+      sum + (svc.items || []).reduce((s, i) => s + (parseFloat(i.discount) || 0), 0), 0);
+    const totalAmount = subtotal - discount;
+    
+    // Create order
+    const order = {
+      id: 'order_' + Date.now(),
+      orderNo: entry.orderNo,
+      customerName: entry.name,
+      customerPhone: entry.phone,
+      customerPhone2: '',
+      customerAddress: customer.address || '',
+      orderDate: new Date().toISOString(),
+      dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days from now
+      services: services,
+      subtotal: subtotal,
+      discount: discount,
+      totalAmount: totalAmount,
+      paidAmount: 0,
+      paymentMode: 'cash',
+      status: 'received',
+      notes: `Created from AI scan`,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser.id,
+      createdByName: currentUser.name,
+      statusHistory: [{
+        status: 'received',
+        changedAt: new Date().toISOString(),
+        changedBy: currentUser.name
+      }]
+    };
+    
+    // Generate tracking code
+    order.trackingCode = generateTrackingCode(order.id);
+    order.trackingExpiry = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+    
+    // Save order
+    const orders = DB.get('orders') || [];
+    orders.push(order);
+    DB.set('orders', orders);
+    
+    // Send WhatsApp if requested
+    if (sendWhatsApp) {
+      sendWhatsAppMessage(order, 'orderReceived');
+    }
+    
+    showToast(`Order ${entry.orderNo} created! ✅`, 'success');
+    return true;
+    
+  } catch (error) {
+    console.error('Error creating order:', error);
+    showToast(`Failed to create order ${entry.orderNo}`, 'error');
+    return false;
+  }
 }
 
 // ============================================================
