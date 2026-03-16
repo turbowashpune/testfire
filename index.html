@@ -1617,12 +1617,53 @@ function showMainApp() {
 // CUSTOMER TRACKING PAGE
 // ============================================================
 function checkTrackingURL() {
+  // Check for query parameter tracking (?track=CODE)
+  const urlParams = new URLSearchParams(window.location.search);
+  const trackingCode = urlParams.get('track');
+  
+  if (trackingCode) {
+    // Find order by tracking code
+    const orders = DB.get('orders') || [];
+    const order = orders.find(o => o.trackingCode === trackingCode);
+    
+    if (order) {
+      // Check if tracking is still valid (60 days)
+      const expiryDate = new Date(order.trackingExpiry);
+      const now = new Date();
+      
+      if (now <= expiryDate) {
+        showTrackingPage(order.orderNo);
+        return;
+      } else {
+        // Tracking link expired
+        showTrackingExpired();
+        return;
+      }
+    }
+  }
+  
+  // Check for path-based tracking (/track/ORDER-NUMBER)
   const path = window.location.pathname;
   const match = path.match(/\/track\/([A-Z]+-\d+)/i);
   if (match) {
     const orderNo = match[1].toUpperCase();
     showTrackingPage(orderNo);
   }
+}
+
+function showTrackingExpired() {
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('trackingPage').style.display = 'block';
+  
+  const content = document.getElementById('trackingContent');
+  content.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">⏰</div>
+      <h3>Tracking Link Expired</h3>
+      <p>This tracking link has expired (valid for 60 days)</p>
+      <p style="margin-top:12px;font-size:13px;color:var(--text3);">Please contact the shop for order status.</p>
+    </div>`;
 }
 
 function showTrackingPage(orderNo) {
@@ -2491,7 +2532,7 @@ function renderDueDateNew() {
     !['paid_delivered', 'unpaid_delivered', 'cancelled'].includes(o.status)
   );
   
-  // Generate date range: Last 7 days + Today + Next 30 days
+  // Generate date range: Last 30 days + Today + Next 30 days (2 months total)
   const dateRange = generateDateRange();
   
   // Group orders by due date
@@ -2518,8 +2559,8 @@ function generateDateRange() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  // Last 7 days
-  for (let i = 7; i >= 1; i--) {
+  // Last 30 days (1 month)
+  for (let i = 30; i >= 1; i--) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     dates.push(date.toISOString().split('T')[0]);
@@ -2528,7 +2569,7 @@ function generateDateRange() {
   // Today
   dates.push(today.toISOString().split('T')[0]);
   
-  // Next 30 days
+  // Next 30 days (1 month)
   for (let i = 1; i <= 30; i++) {
     const date = new Date(today);
     date.setDate(date.getDate() + i);
@@ -4156,11 +4197,11 @@ function sendWhatsAppMessage(order, templateKey) {
     .replace(/{shopName}/g, shop.name||'TurboWash Laundry')
     .replace(/{shopPhone}/g, shop.phone||'');
 
-  // Add tracking URL for received orders
-  if (templateKey === 'orderReceived' && order.trackingCode) {
-    const trackingUrl = window.location.origin + window.location.pathname + '?track=' + order.trackingCode;
-    msg += '\n\n📍 Track your order:\n' + trackingUrl + '\n\n(Link valid for 60 days)';
-  }
+  // Add tracking URL for received orders (DISABLED - not working correctly)
+  // if (templateKey === 'orderReceived' && order.trackingCode) {
+  //   const trackingUrl = window.location.origin + window.location.pathname + '?track=' + order.trackingCode;
+  //   msg += '\n\n📍 Track your order:\n' + trackingUrl + '\n\n(Link valid for 60 days)';
+  // }
 
   const phone = order.customerPhone.replace(/[^0-9]/g,'');
   const url = `https://wa.me/${phone.startsWith('91')?phone:'91'+phone}?text=${encodeURIComponent(msg)}`;
