@@ -1469,25 +1469,26 @@ Your order has been received! 🧺
 
 Order No: {orderNo}
 Services: {services}
-Total Amount: ₹{totalAmount}
+{previousBalance}
+*Total Amount: ₹{totalAmount}*
 Advance Paid: ₹{advancePaid}
-Balance Due: ₹{balanceDue}
 
 Expected Delivery: {dueDate}
 
-Thank you for choosing TurboWash Laundry!
-📞 +91-9011637090
-🕐 9AM - 9PM`,
+Thank you for choosing {shopName}!
+📞 {shopPhone}
+🕐 {shopHours}`,
       orderReady: `Dear {customerName},
 
-Your order {orderNo} is ready for pickup! ✅🎉
+Your order {orderNo} is *ready* for pickup! ✅🎉
 
 Please collect at your earliest convenience.
 
 Balance Due: ₹{balanceDue}
 
-Thank you for choosing TurboWash Laundry!
-📞 +91-9011637090`,
+Thank you for choosing {shopName}!
+📞 {shopPhone}
+🕐 {shopHours}`,
       feedbackRequest: `Hi {customerName}! 👋
 
 Thank you for choosing {shopName}! 
@@ -4185,17 +4186,28 @@ function sendWhatsAppMessage(order, templateKey) {
   const shop = DB.get('shopSettings') || {};
   const balance = (order.totalAmount||0) - (order.paidAmount||0);
   const serviceNames = (order.services||[]).map(s=>s.serviceName).join(', ');
+  
+  // Calculate previous balance
+  const previousBalance = getCustomerPreviousBalance(order);
+  
+  // Build previous balance line (only if > 0)
+  let previousBalanceLine = '';
+  if (previousBalance > 0) {
+    previousBalanceLine = `Previous Balance: ₹${previousBalance.toFixed(2)}\n`;
+  }
 
   let msg = template
     .replace(/{customerName}/g, order.customerName)
     .replace(/{orderNo}/g, order.orderNo)
     .replace(/{services}/g, serviceNames)
+    .replace(/{previousBalance}/g, previousBalanceLine)
     .replace(/{totalAmount}/g, (order.totalAmount||0).toFixed(2))
     .replace(/{advancePaid}/g, (order.paidAmount||0).toFixed(2))
     .replace(/{balanceDue}/g, balance.toFixed(2))
     .replace(/{dueDate}/g, formatDate(order.dueDate))
     .replace(/{shopName}/g, shop.name||'TurboWash Laundry')
-    .replace(/{shopPhone}/g, shop.phone||'');
+    .replace(/{shopPhone}/g, shop.phone||'+91-9011637090')
+    .replace(/{shopHours}/g, shop.hours||'9AM - 9PM');
 
   // Add tracking URL for received orders (DISABLED - not working correctly)
   // if (templateKey === 'orderReceived' && order.trackingCode) {
