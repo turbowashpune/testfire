@@ -1602,6 +1602,9 @@ function showMainApp() {
   checkOverduePopup();
   updateLastBackup();
   
+  // Migrate WhatsApp templates to new format (if needed)
+  migrateWhatsAppTemplates();
+  
   // Auto-sync from cloud on login
   if (typeof firebase !== 'undefined') {
     setTimeout(() => {
@@ -1612,6 +1615,69 @@ function showMainApp() {
   
   // Check if this is a tracking URL
   checkTrackingURL();
+}
+
+// ============================================================
+// WHATSAPP TEMPLATE MIGRATION
+// ============================================================
+function migrateWhatsAppTemplates() {
+  const templates = DB.get('whatsappTemplates') || {};
+  const shop = DB.get('shopSettings') || {};
+  
+  // Check if templates need migration (look for old format markers)
+  const needsMigration = 
+    (templates.orderReceived && templates.orderReceived.includes('Balance Due: ₹{balanceDue}')) ||
+    (templates.orderReady && !templates.orderReady.includes('*ready*'));
+  
+  if (needsMigration) {
+    console.log('🔄 Migrating WhatsApp templates to new format...');
+    
+    // Update to new templates
+    const newTemplates = {
+      orderReceived: `Dear {customerName},
+
+Your order has been received! 🧺
+
+Order No: {orderNo}
+Services: {services}
+{previousBalance}
+*Total Amount: ₹{totalAmount}*
+Advance Paid: ₹{advancePaid}
+
+Expected Delivery: {dueDate}
+
+Thank you for choosing {shopName}!
+📞 {shopPhone}
+🕐 {shopHours}`,
+      orderReady: `Dear {customerName},
+
+Your order {orderNo} is *ready* for pickup! ✅🎉
+
+Please collect at your earliest convenience.
+
+Balance Due: ₹{balanceDue}
+
+Thank you for choosing {shopName}!
+📞 {shopPhone}
+🕐 {shopHours}`,
+      feedbackRequest: templates.feedbackRequest || `Hi {customerName}! 👋
+
+Thank you for choosing {shopName}! 
+
+We hope you loved our service. 😊
+
+We'd love to hear your feedback! Please rate us:
+⭐⭐⭐⭐⭐
+
+Leave a Google review: https://g.page/r/YOUR_GOOGLE_REVIEW_LINK/review
+
+Your feedback helps us serve you better! 🙏`
+    };
+    
+    DB.set('whatsappTemplates', newTemplates);
+    console.log('✅ WhatsApp templates updated successfully!');
+    showToast('WhatsApp templates updated! 📱', 'success');
+  }
 }
 
 // ============================================================
