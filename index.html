@@ -1192,19 +1192,18 @@ async function manualSync() {
   text.textContent = 'Syncing...';
   
   try {
-    // STEP 1: Push all local data to cloud
-    const keys = ['orders', 'customers', 'services', 'users', 'shopSettings', 'orderCounter', 'whatsappTemplates', 'shareCounts'];
+    // STEP 1: Push all local data to cloud (including empty/deleted data)
+    const keys = ['orders', 'customers', 'services', 'users', 'shopSettings', 'orderCounter', 'whatsappTemplates', 'shareCounts', 'expenses'];
     let pushed = 0;
     
     for (const key of keys) {
       const data = DB.get(key);
-      if (data) {
-        await firestore.collection('appData').doc(key).set({
-          data: data,
-          updated: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        pushed++;
-      }
+      // Push even if data is null/empty - this syncs deletions!
+      await firestore.collection('appData').doc(key).set({
+        data: data || (key === 'orderCounter' ? 0 : []), // Empty array for lists, 0 for counter
+        updated: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      pushed++;
     }
     
     // STEP 2: Pull all data from cloud
@@ -1267,10 +1266,19 @@ async function pullFromCloud() {
     snapshot.forEach(doc => {
       const local = DB.get(doc.id);
       const cloud = doc.data().data;
-      // Use cloud data if local doesn't exist
-      if (!local && cloud) {
-        localStorage.setItem('twl_' + doc.id, JSON.stringify(cloud));
-        updated = true;
+      
+      // Always prefer cloud data (includes empty arrays from reset)
+      // Compare as JSON strings to detect changes
+      const cloudStr = JSON.stringify(cloud);
+      const localStr = JSON.stringify(local);
+      
+      if (cloudStr !== localStr) {
+        // Cloud is different from local - use cloud version
+        if (cloud !== undefined && cloud !== null) {
+          localStorage.setItem('twl_' + doc.id, cloudStr);
+          updated = true;
+          console.log(`✅ Updated ${doc.id} from cloud`);
+        }
       }
     });
     if (updated) {
@@ -7540,14 +7548,50 @@ function resetAllData() {
       DB.del('lastBackup');
       DB.del('lastOverduePopup');
 
-      showToast('All data deleted! Backup saved. Reloading...', 'success');
+      showToast('Data deleted! Syncing to cloud...', 'success');
       
-      // Reload page after 2 seconds
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
+      // CRITICAL: Sync deletions to cloud before reload
+      syncResetToCloud().then(() => {
+        showToast('Reset synced! Reloading...', 'success');
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      }).catch(err => {
+        console.error('Sync after reset failed:', err);
+        showToast('⚠️ Reset complete but sync failed. Manual sync recommended.', 'warning');
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      });
     }
   );
+}
+
+// Sync reset/empty data to cloud
+async function syncResetToCloud() {
+  if (typeof firebase === 'undefined') {
+    console.log('Firebase not available, skipping cloud sync');
+    return;
+  }
+  
+  try {
+    // Push empty data to cloud for all keys
+    const keys = ['orders', 'customers', 'orderCounter', 'shareCounts', 'expenses'];
+    
+    for (const key of keys) {
+      const emptyData = (key === 'orderCounter') ? 0 : [];
+      await firestore.collection('appData').doc(key).set({
+        data: emptyData,
+        updated: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      console.log(`✅ Synced empty ${key} to cloud`);
+    }
+    
+    console.log('✅ Reset synced to cloud successfully');
+  } catch (error) {
+    console.error('❌ Failed to sync reset to cloud:', error);
+    throw error;
+  }
 }
 
 // ============================================================
