@@ -841,11 +841,13 @@ input[type="number"] {
               <div class="s-info"><div class="s-title">Export Backup</div><div class="s-sub" id="lastBackupText">Last backup: Never</div></div>
               <span class="s-arrow">›</span>
             </div>
+            <!-- Import Data DISABLED - Prevents old data from overwriting cloud
             <div class="settings-item" onclick="importData()">
               <span class="s-icon">📥</span>
               <div class="s-info"><div class="s-title">Import Data</div><div class="s-sub">Restore from backup file</div></div>
               <span class="s-arrow">›</span>
             </div>
+            -->
             <div class="settings-item" onclick="resetAllData()" style="border-top:2px solid var(--danger);">
               <span class="s-icon" style="color:var(--danger);">🗑️</span>
               <div class="s-info"><div class="s-title" style="color:var(--danger);">Reset All Data</div><div class="s-sub">⚠️ Delete everything - cannot be undone</div></div>
@@ -1192,7 +1194,21 @@ async function manualSync() {
   text.textContent = 'Syncing...';
   
   try {
-    // STEP 1: Push all local data to cloud (including empty/deleted data)
+    // STEP 1: PULL from cloud FIRST (cloud is source of truth)
+    text.textContent = 'Pulling...';
+    const snapshot = await firestore.collection('appData').get();
+    let pulled = 0;
+    
+    snapshot.forEach(doc => {
+      const cloudData = doc.data().data;
+      if (cloudData !== undefined && cloudData !== null) {
+        localStorage.setItem('twl_' + doc.id, JSON.stringify(cloudData));
+        pulled++;
+      }
+    });
+    
+    // STEP 2: Push all local data to cloud (now based on latest cloud data)
+    text.textContent = 'Pushing...';
     const keys = ['orders', 'customers', 'services', 'users', 'shopSettings', 'orderCounter', 'whatsappTemplates', 'shareCounts', 'expenses'];
     let pushed = 0;
     
@@ -1206,18 +1222,6 @@ async function manualSync() {
       pushed++;
     }
     
-    // STEP 2: Pull all data from cloud
-    const snapshot = await firestore.collection('appData').get();
-    let pulled = 0;
-    
-    snapshot.forEach(doc => {
-      const cloudData = doc.data().data;
-      if (cloudData) {
-        localStorage.setItem('twl_' + doc.id, JSON.stringify(cloudData));
-        pulled++;
-      }
-    });
-    
     // STEP 3: Refresh UI
     if (typeof renderOrders === 'function') renderOrders();
     if (typeof renderDueDatePage === 'function') renderDueDatePage();
@@ -1227,7 +1231,7 @@ async function manualSync() {
     
     icon.textContent = '✅';
     text.textContent = 'Synced!';
-    showToast(`Sync complete! ↑${pushed} ↓${pulled}`, 'success');
+    showToast(`Sync complete! ↓${pulled} ↑${pushed}`, 'success');
     
     setTimeout(() => {
       icon.textContent = '🔄';
@@ -1259,7 +1263,11 @@ DB.set = function(key, val) {
 
 // Pull from cloud on startup
 async function pullFromCloud() {
-  if (typeof firebase === 'undefined') return;
+  if (typeof firebase === 'undefined') {
+    console.log('Firebase not available');
+    return;
+  }
+  
   try {
     const snapshot = await firestore.collection('appData').get();
     let updated = false;
@@ -1281,16 +1289,17 @@ async function pullFromCloud() {
         }
       }
     });
+    
     if (updated) {
-      console.log('✅ Synced from cloud');
-      // Refresh UI instead of reload
-      if (typeof renderOrders === 'function') renderOrders();
-      if (typeof renderDueDatePage === 'function') renderDueDatePage();
-      if (typeof renderDueDateNew === 'function') renderDueDateNew();
-      if (typeof refreshDashboard === 'function') refreshDashboard();
+      console.log('✅ Data synced from cloud');
+    } else {
+      console.log('✅ Local data already up to date');
     }
+    
+    return updated;
   } catch(e) { 
     console.error('Pull error:', e);
+    throw e; // Re-throw so caller can handle
   }
 }
 
@@ -1594,31 +1603,71 @@ function showMainApp() {
   applyRoleUI();
   updateHeaderInfo();
   updateHeaderLogo();
-  refreshDashboard();
-  renderOrders();
-  renderCustomers();
-
-  // Start due date auto-refresh
-  renderDueDatePage();
-  if (dueDateRefreshInterval) clearInterval(dueDateRefreshInterval);
-  dueDateRefreshInterval = setInterval(() => {
-    renderDueDatePage();
-    refreshDashboard();
-    checkOverduePopup();
-  }, 60000);
-
-  checkOverduePopup();
-  updateLastBackup();
   
   // Migrate WhatsApp templates to new format (if needed)
   migrateWhatsAppTemplates();
   
-  // Auto-sync from cloud on login
+  // CRITICAL: Pull from cloud FIRST before rendering any data
   if (typeof firebase !== 'undefined') {
-    setTimeout(() => {
-      console.log('🔄 Auto-syncing from cloud...');
-      manualSync();
-    }, 2000);
+    console.log('🔄 Syncing from cloud on login...');
+    showToast('Syncing data from cloud...', '');
+    
+    // Pull cloud data first, then render UI
+    pullFromCloud().then(() => {
+      console.log('✅ Cloud sync complete, rendering UI...');
+      refreshDashboard();
+      renderOrders();
+      renderCustomers();
+      renderDueDatePage();
+      showToast('Sync complete! ✅', 'success');
+      
+      // Start due date auto-refresh
+      if (dueDateRefreshInterval) clearInterval(dueDateRefreshInterval);
+      dueDateRefreshInterval = setInterval(() => {
+        renderDueDatePage();
+        refreshDashboard();
+        checkOverduePopup();
+      }, 60000);
+      
+      checkOverduePopup();
+      updateLastBackup();
+    }).catch(err => {
+      console.error('Cloud sync failed:', err);
+      showToast('⚠️ Cloud sync failed, using local data', 'warning');
+      // Render with local data as fallback
+      refreshDashboard();
+      renderOrders();
+      renderCustomers();
+      renderDueDatePage();
+      
+      // Start due date auto-refresh
+      if (dueDateRefreshInterval) clearInterval(dueDateRefreshInterval);
+      dueDateRefreshInterval = setInterval(() => {
+        renderDueDatePage();
+        refreshDashboard();
+        checkOverduePopup();
+      }, 60000);
+      
+      checkOverduePopup();
+      updateLastBackup();
+    });
+  } else {
+    // No Firebase, use local data only
+    refreshDashboard();
+    renderOrders();
+    renderCustomers();
+    renderDueDatePage();
+    
+    // Start due date auto-refresh
+    if (dueDateRefreshInterval) clearInterval(dueDateRefreshInterval);
+    dueDateRefreshInterval = setInterval(() => {
+      renderDueDatePage();
+      refreshDashboard();
+      checkOverduePopup();
+    }, 60000);
+    
+    checkOverduePopup();
+    updateLastBackup();
   }
   
   // Check if this is a tracking URL
@@ -3172,6 +3221,7 @@ function toggleService(id, name, pricingType, el) {
       }];
     }
     renderServiceItems(id, name, pricingType, serviceItemsData[id]);
+    updatePaymentSummary(); // Update totals immediately when service is selected
   } else {
     const container = document.getElementById('svc_'+id);
     if (container) container.remove();
