@@ -4122,6 +4122,9 @@ function getCustomerPreviousUnpaidOrders(currentOrder) {
     // Created before current order
     if (new Date(o.createdAt) >= new Date(currentOrder.createdAt)) return false;
     
+    // CRITICAL FIX: Exclude orders already marked as "Paid & Delivered"
+    if (o.status === 'paid_delivered') return false;
+    
     // Has unpaid balance
     const balance = (o.totalAmount || 0) - (o.paidAmount || 0);
     if (balance <= 0) return false;
