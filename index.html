@@ -433,7 +433,7 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
 .empty-state p { font-size:13px; color:var(--text3); margin-top:4px; }
 
 /* ===== INVOICE PREVIEW ===== */
-.invoice-preview { background:white; border:1px solid var(--border); border-radius:var(--radius2); padding:20px; font-size:12px; }
+.invoice-preview { background:white; border:1px solid var(--border); border-radius:var(--radius2); padding:20px 10px; font-size:12px; }
 .inv-header { text-align:center; margin-bottom:16px; padding-bottom:12px; border-bottom:2px dashed var(--border); }
 .inv-header img { height:50px; margin-bottom:8px; }
 .inv-header h2 { font-family:'Nunito',sans-serif; font-weight:900; font-size:18px; color:var(--orange); }
@@ -657,6 +657,29 @@ input[type="number"] {
             <!-- Chart Container -->
             <div id="revenueChartContainer" style="background:white;border-radius:12px;padding:16px;box-shadow:var(--shadow2);overflow-x:auto;min-height:250px;">
               <div class="loading" style="padding:40px;"><div class="spinner"></div></div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- DAILY COLLECTION SECTION (All Users) -->
+        <div id="dailyCollectionSection">
+          <div class="section-header" style="margin-top:16px;">
+            <h3>💵 Daily Collection</h3>
+          </div>
+          
+          <!-- Collection Tabs -->
+          <div style="padding:0 16px;">
+            <div class="collection-tabs" style="display:flex;gap:8px;margin-bottom:12px;">
+              <button class="collection-tab" onclick="switchCollectionTab('total',this)" style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--border);background:white;font-size:13px;font-weight:700;cursor:pointer;color:var(--text2);">Total</button>
+              <button class="collection-tab" onclick="switchCollectionTab('online',this)" style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--border);background:white;font-size:13px;font-weight:700;cursor:pointer;color:var(--text2);">Online</button>
+              <button class="collection-tab active" onclick="switchCollectionTab('cash',this)" style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--orange);background:var(--orange);font-size:13px;font-weight:700;cursor:pointer;color:white;">Cash</button>
+            </div>
+            
+            <!-- Collection Display -->
+            <div id="collectionDisplay" style="background:white;border-radius:12px;padding:20px;box-shadow:var(--shadow2);text-align:center;">
+              <div style="font-size:14px;color:var(--text2);margin-bottom:8px;" id="collectionLabel">Cash Collection Today</div>
+              <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:36px;color:var(--orange);" id="collectionAmount">₹0</div>
+              <div style="font-size:12px;color:var(--text3);margin-top:8px;" id="collectionOrders">0 orders</div>
             </div>
           </div>
         </div>
@@ -2022,6 +2045,9 @@ function refreshDashboard() {
   document.getElementById('dashGreeting').textContent = greet;
   document.getElementById('dashDate').textContent = formatDate(new Date()) + ' | ' + (DB.get('shopSettings')||{}).name;
 
+  // Render Daily Collection
+  renderDailyCollection(currentCollectionTab);
+
   // Recent orders - REMOVED (will be replaced with Revenue feature)
   // const recent = [...orders].sort((a,b) => new Date(b.createdAt)-new Date(a.createdAt)).slice(0,10);
   // const container = document.getElementById('recentOrdersList');
@@ -2219,6 +2245,66 @@ function renderBarChart(data) {
   html += '</div>';
   
   container.innerHTML = html;
+}
+
+// ============================================================
+// DAILY COLLECTION
+// ============================================================
+let currentCollectionTab = 'cash';
+
+function switchCollectionTab(tab, el) {
+  currentCollectionTab = tab;
+  
+  // Update tab styling
+  document.querySelectorAll('.collection-tab').forEach(t => {
+    t.style.border = '2px solid var(--border)';
+    t.style.background = 'white';
+    t.style.color = 'var(--text2)';
+  });
+  el.style.border = '2px solid var(--orange)';
+  el.style.background = 'var(--orange)';
+  el.style.color = 'white';
+  
+  // Update display
+  renderDailyCollection(tab);
+}
+
+function renderDailyCollection(type = 'cash') {
+  const orders = DB.get('orders') || [];
+  const today = new Date().toDateString();
+  
+  // Get today's paid orders
+  const todayOrders = orders.filter(o => {
+    const orderDate = new Date(o.createdAt).toDateString();
+    return orderDate === today && (o.paidAmount || 0) > 0;
+  });
+  
+  let amount = 0;
+  let count = 0;
+  let label = '';
+  
+  if (type === 'total') {
+    // Total collection (all payment methods)
+    amount = todayOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
+    count = todayOrders.length;
+    label = 'Total Collection Today';
+  } else if (type === 'online') {
+    // Online collection (UPI)
+    const onlineOrders = todayOrders.filter(o => o.paymentMode === 'upi');
+    amount = onlineOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
+    count = onlineOrders.length;
+    label = 'Online Collection Today';
+  } else {
+    // Cash collection
+    const cashOrders = todayOrders.filter(o => o.paymentMode === 'cash');
+    amount = cashOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
+    count = cashOrders.length;
+    label = 'Cash Collection Today';
+  }
+  
+  document.getElementById('collectionLabel').textContent = label;
+  document.getElementById('collectionAmount').textContent = '₹' + amount.toFixed(0);
+  document.getElementById('collectionOrders').textContent = count + ' order' + (count !== 1 ? 's' : '');
 }
 
 // ============================================================
@@ -3915,15 +4001,20 @@ function showOrderDetail(orderId) {
           <th style="padding:5px 8px;text-align:left;">Item</th>
           <th style="padding:5px 8px;text-align:center;">Qty</th>
           <th style="padding:5px 8px;text-align:right;">Price</th>
+          <th style="padding:5px 8px;text-align:right;color:#0277BD;">Disc</th>
           <th style="padding:5px 8px;text-align:right;">Sub</th>
         </tr>
-        ${(svc.items||[]).map(item => `<tr>
+        ${(svc.items||[]).map(item => {
+          const disc = parseFloat(item.discount)||0;
+          const sub = Math.max(0,((parseFloat(item.qty)||1)*(parseFloat(item.price)||0))-disc);
+          return `<tr>
           <td style="padding:5px 8px;border-bottom:1px solid var(--border);">${item.name||'-'}</td>
           <td style="padding:5px 8px;text-align:center;border-bottom:1px solid var(--border);">${item.qty||1}</td>
           <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);">₹${item.price||0}</td>
-          <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);font-weight:700;">₹${((item.qty||1)*(item.price||0)).toFixed(0)}</td>
-        </tr>`).join('')}
-        <tr><td colspan="3" style="padding:5px 8px;font-weight:700;text-align:right;">Service Total:</td>
+          <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);color:#0277BD;">₹${disc.toFixed(0)}</td>
+          <td style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);font-weight:700;">₹${sub.toFixed(0)}</td>
+        </tr>`;}).join('')}
+        <tr><td colspan="4" style="padding:5px 8px;font-weight:700;text-align:right;">Service Total:</td>
           <td style="padding:5px 8px;text-align:right;font-weight:800;color:var(--orange);">₹${(svc.serviceTotal||0).toFixed(0)}</td></tr>
       </table>
     </div>`).join('');
@@ -4424,7 +4515,7 @@ function showInvoice(orderId) {
         <td style="padding:4px 8px;">${item.name||'-'}</td>
         <td style="padding:4px 8px;text-align:center;">${item.qty||1}</td>
         <td style="padding:4px 8px;text-align:right;">₹${item.price||0}</td>
-        <td style="padding:4px 8px;text-align:right;color:#0277BD;">${disc>0?'-₹'+disc:'-'}</td>
+        <td style="padding:4px 8px;text-align:right;color:#0277BD;">₹${disc.toFixed(0)}</td>
         <td style="padding:4px 8px;text-align:right;font-weight:700;">₹${sub.toFixed(0)}</td>
       </tr>`;}).join('')}
   `).join('');
@@ -4470,7 +4561,7 @@ function showInvoice(orderId) {
         
         return `<div class="inv-total">
           <div class="inv-total-row"><span>Subtotal</span><strong>₹${(order.subtotal||0).toFixed(2)}</strong></div>
-          <div class="inv-total-row" style="color:#0277BD;"><span>Total Discount</span><strong>-₹${(order.discount||0).toFixed(2)}</strong></div>
+          <div class="inv-total-row" style="color:#0277BD;"><span>Total Discount</span><strong>₹${(order.discount||0).toFixed(2)}</strong></div>
           <hr style="margin:6px 0;border:none;border-top:1px solid var(--border);">
           <div class="inv-total-row"><span>Total Amount</span><strong>₹${(order.totalAmount||0).toFixed(2)}</strong></div>
           <div class="inv-total-row"><span>Advance Paid</span><strong>₹${(order.paidAmount||0).toFixed(2)}</strong></div>
