@@ -3989,10 +3989,25 @@ function saveOrder() {
   if (editingOrderId) {
     const idx = orders.findIndex(o => o.id === editingOrderId);
     if (idx > -1) {
+      const existingOrder = orders[idx];
+      
+      // Preserve existing paymentHistory or initialize if missing
+      let paymentHistory = existingOrder.paymentHistory || [];
+      if (paymentHistory.length === 0 && paidAmount > 0) {
+        // Order has no payment history but has paidAmount - create initial entry
+        paymentHistory = [{
+          amount: paidAmount,
+          mode: paymentMode,
+          date: existingOrder.createdAt || new Date().toISOString(),
+          by: existingOrder.createdByName || currentUser.name
+        }];
+      }
+      
       orders[idx] = {
-        ...orders[idx],
+        ...existingOrder,
         customerName: name, customerPhone: phone, customerPhone2: phone2, customerAddress: address,
         orderDate, dueDate, services: orderServices, subtotal, discount: totalDiscount, totalAmount, paidAmount, paymentMode, notes,
+        paymentHistory,
         updatedAt: new Date().toISOString(),
         updatedBy: currentUser.id,
         updatedByName: currentUser.name
@@ -4015,6 +4030,12 @@ function saveOrder() {
       trackingCode: generateTrackingCode('ord_' + Date.now()),
       trackingExpiry: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
       statusHistory: [{ status:'received', changedAt: new Date().toISOString(), changedBy: currentUser.name }],
+      paymentHistory: paidAmount > 0 ? [{ 
+        amount: paidAmount, 
+        mode: paymentMode, 
+        date: new Date().toISOString(), 
+        by: currentUser.name 
+      }] : [],
       createdAt: new Date().toISOString(),
       createdBy: currentUser.id,
       createdByName: currentUser.name
