@@ -2484,6 +2484,36 @@ function dismissStatusNotification(orderId) {
   renderOrders(); // Refresh to remove the banner
 }
 
+function checkIfNewOrder(order) {
+  // Check if order was created recently and hasn't been dismissed
+  if (order.newOrderNotificationDismissed) return false;
+  
+  // Show notification for orders created within last 24 hours
+  const createdAt = new Date(order.createdAt);
+  const now = new Date();
+  const hoursSince = (now - createdAt) / (1000 * 60 * 60);
+  
+  // Show for 24 hours OR until status changes from 'received'
+  if (hoursSince < 24 && order.status === 'received') {
+    return true;
+  }
+  
+  return false;
+}
+
+function dismissNewOrderNotification(orderId) {
+  const orders = DB.get('orders') || [];
+  const order = orders.find(o => o.id === orderId);
+  if (!order) return;
+  
+  // Mark notification as dismissed
+  order.newOrderNotificationDismissed = true;
+  
+  DB.set('orders', orders);
+  showToast('Notification dismissed', 'info');
+  renderOrders(); // Refresh to remove the banner
+}
+
 function isOverdue(order) {
   if (!order.dueDate || ['paid_delivered','unpaid_delivered','cancelled'].includes(order.status)) return false;
   const due = new Date(order.dueDate); due.setHours(23,59,59,0);
@@ -2531,11 +2561,19 @@ function renderOrderCard(order) {
   
   // Check if status changed but WhatsApp not sent
   const needsNotification = checkIfNeedsNotification(order);
+  
+  // Check if order is newly created (show notification)
+  const isNewOrder = checkIfNewOrder(order);
+  
   const dueToday = isDueToday(order);
   const balance = (order.totalAmount||0) - (order.paidAmount||0);
   const counts = DB.get('shareCounts') || {};
   const waCount = counts['wa_'+order.id] || 0;
   const invCount = counts['inv_'+order.id] || 0;
+  
+  // Check if operator
+  const isOperator = currentUser.role === 'operator';
+  
   return `<div class="order-card">
     <div onclick="showOrderDetail('${order.id}')">
       <div class="order-card-top">
@@ -2558,7 +2596,7 @@ function renderOrderCard(order) {
         </div>
       </div>
     </div>
-    <div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+    ${!isOperator ? `<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
       <button onclick="event.stopPropagation();quickShareWhatsAppText('${order.id}')"
         style="flex:1;padding:8px 6px;border-radius:8px;border:1.5px solid #25D366;background:rgba(37,211,102,0.1);color:#128C7E;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;">
         💬 Share on WhatsApp
@@ -2567,8 +2605,8 @@ function renderOrderCard(order) {
         style="flex:1;padding:8px 6px;border-radius:8px;border:1.5px solid var(--orange);background:rgba(255,107,0,0.1);color:var(--orange);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;">
         📄 Share Invoice
       </button>
-    </div>
-    ${order.status === 'paid_delivered' ? `<div style="margin-top:6px;">
+    </div>` : ''}
+    ${order.status === 'paid_delivered' && !isOperator ? `<div style="margin-top:6px;">
       ${order.feedbackRequested ? `<div style="padding:8px 10px;background:rgba(76,175,80,0.1);border:1.5px solid #4CAF50;border-radius:8px;color:#2E7D32;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;">
         ✅ Feedback Sent
       </div>` : `<button onclick="event.stopPropagation();sendFeedbackRequest('${order.id}')"
@@ -2576,7 +2614,18 @@ function renderOrderCard(order) {
         ⭐ Ask for Feedback
       </button>`}
     </div>` : ''}
-    ${needsNotification ? `<div style="margin-top:8px;padding:8px 10px;background:linear-gradient(135deg,#FFB300,#F57F17);border-radius:8px;display:flex;align-items:center;gap:8px;position:relative;">
+    ${isNewOrder ? `<div style="margin-top:8px;padding:8px 10px;background:linear-gradient(135deg,#29B6F6,#0288D1);border-radius:8px;display:flex;align-items:center;gap:8px;position:relative;">
+      <span style="font-size:16px;">🆕</span>
+      <div style="flex:1;color:white;">
+        <div style="font-size:11px;font-weight:700;">New Order Created!</div>
+        <div style="font-size:10px;opacity:0.9;">by ${order.createdByName || 'Unknown'}</div>
+      </div>
+      <button onclick="event.stopPropagation();dismissNewOrderNotification('${order.id}')" 
+        style="position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.3);color:white;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;padding:0;line-height:1;">
+        ✕
+      </button>
+    </div>` : ''}
+    ${needsNotification && !isOperator ? `<div style="margin-top:8px;padding:8px 10px;background:linear-gradient(135deg,#FFB300,#F57F17);border-radius:8px;display:flex;align-items:center;gap:8px;position:relative;">
       <span style="font-size:16px;">📢</span>
       <div style="flex:1;color:white;">
         <div style="font-size:11px;font-weight:700;">Status Updated!</div>
