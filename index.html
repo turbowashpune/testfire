@@ -679,7 +679,12 @@ input[type="number"] {
             <div id="collectionDisplay" style="background:white;border-radius:12px;padding:20px;box-shadow:var(--shadow2);text-align:center;">
               <div style="font-size:14px;color:var(--text2);margin-bottom:8px;" id="collectionLabel">Cash Collection Today</div>
               <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:36px;color:var(--orange);" id="collectionAmount">₹0</div>
-              <div style="font-size:12px;color:var(--text3);margin-top:8px;" id="collectionOrders">0 orders</div>
+              <div style="font-size:12px;color:var(--text3);margin-top:8px;cursor:pointer;" id="collectionOrders" onclick="toggleCollectionAccordion()">0 orders ▼</div>
+            </div>
+            
+            <!-- Order List Accordion -->
+            <div id="collectionAccordion" style="background:white;border-radius:12px;margin-top:12px;box-shadow:var(--shadow2);overflow:hidden;max-height:0;transition:max-height 0.3s ease;">
+              <div id="collectionOrderList"></div>
             </div>
           </div>
         </div>
@@ -2273,38 +2278,158 @@ function renderDailyCollection(type = 'cash') {
   const orders = DB.get('orders') || [];
   const today = new Date().toDateString();
   
-  // Get today's paid orders
-  const todayOrders = orders.filter(o => {
-    const orderDate = new Date(o.createdAt).toDateString();
-    return orderDate === today && (o.paidAmount || 0) > 0;
+  let totalAmount = 0;
+  let cashAmount = 0;
+  let onlineAmount = 0;
+  let totalOrders = new Set();
+  let cashOrders = new Set();
+  let onlineOrders = new Set();
+  let orderDetails = { total: [], cash: [], online: [] };
+  
+  // Loop through all orders and their payment history
+  orders.forEach(order => {
+    if (!order.paymentHistory || order.paymentHistory.length === 0) return;
+    
+    // Check each payment in history
+    order.paymentHistory.forEach(payment => {
+      const paymentDate = new Date(payment.date).toDateString();
+      
+      // Only count payments made today
+      if (paymentDate === today) {
+        const amt = parseFloat(payment.amount) || 0;
+        
+        // Add to total
+        totalAmount += amt;
+        totalOrders.add(order.id);
+        if (!orderDetails.total.find(o => o.id === order.id)) {
+          orderDetails.total.push({ 
+            id: order.id, 
+            orderNo: order.orderNo, 
+            customerName: order.customerName,
+            amount: amt
+          });
+        } else {
+          // Add to existing order amount
+          const existing = orderDetails.total.find(o => o.id === order.id);
+          existing.amount += amt;
+        }
+        
+        // Add to cash or online based on payment mode
+        if (payment.mode === 'cash') {
+          cashAmount += amt;
+          cashOrders.add(order.id);
+          if (!orderDetails.cash.find(o => o.id === order.id)) {
+            orderDetails.cash.push({ 
+              id: order.id, 
+              orderNo: order.orderNo, 
+              customerName: order.customerName,
+              amount: amt
+            });
+          } else {
+            const existing = orderDetails.cash.find(o => o.id === order.id);
+            existing.amount += amt;
+          }
+        } else if (payment.mode === 'upi') {
+          onlineAmount += amt;
+          onlineOrders.add(order.id);
+          if (!orderDetails.online.find(o => o.id === order.id)) {
+            orderDetails.online.push({ 
+              id: order.id, 
+              orderNo: order.orderNo, 
+              customerName: order.customerName,
+              amount: amt
+            });
+          } else {
+            const existing = orderDetails.online.find(o => o.id === order.id);
+            existing.amount += amt;
+          }
+        }
+      }
+    });
   });
   
   let amount = 0;
   let count = 0;
   let label = '';
+  let currentOrders = [];
   
   if (type === 'total') {
-    // Total collection (all payment methods)
-    amount = todayOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
-    count = todayOrders.length;
+    amount = totalAmount;
+    count = totalOrders.size;
     label = 'Total Collection Today';
+    currentOrders = orderDetails.total;
   } else if (type === 'online') {
-    // Online collection (UPI)
-    const onlineOrders = todayOrders.filter(o => o.paymentMode === 'upi');
-    amount = onlineOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
-    count = onlineOrders.length;
+    amount = onlineAmount;
+    count = onlineOrders.size;
     label = 'Online Collection Today';
+    currentOrders = orderDetails.online;
   } else {
-    // Cash collection
-    const cashOrders = todayOrders.filter(o => o.paymentMode === 'cash');
-    amount = cashOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
-    count = cashOrders.length;
+    amount = cashAmount;
+    count = cashOrders.size;
     label = 'Cash Collection Today';
+    currentOrders = orderDetails.cash;
   }
   
   document.getElementById('collectionLabel').textContent = label;
   document.getElementById('collectionAmount').textContent = '₹' + amount.toFixed(0);
-  document.getElementById('collectionOrders').textContent = count + ' order' + (count !== 1 ? 's' : '');
+  
+  // Update orders text with arrow
+  const ordersText = count + ' order' + (count !== 1 ? 's' : '');
+  const accordion = document.getElementById('collectionAccordion');
+  const arrow = (accordion && accordion.style.maxHeight !== '0px' && accordion.style.maxHeight !== '') ? '▲' : '▼';
+  document.getElementById('collectionOrders').innerHTML = ordersText + ' ' + arrow;
+  
+  // Render order list in accordion
+  renderCollectionOrderList(currentOrders);
+}
+
+function renderCollectionOrderList(orders) {
+  const container = document.getElementById('collectionOrderList');
+  if (!container) return;
+  
+  if (orders.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text3);font-size:12px;">No orders today</div>';
+    return;
+  }
+  
+  const html = orders.map(order => `
+    <div class="collection-order-item" onclick="showOrderDetail('${order.id}')" style="padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background 0.2s;">
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:13px;color:var(--orange);">${order.orderNo}</div>
+        <div style="font-size:12px;color:var(--text2);">${order.customerName}</div>
+      </div>
+      <div style="font-weight:700;font-size:14px;color:var(--text1);">₹${order.amount.toFixed(0)}</div>
+    </div>
+  `).join('');
+  
+  container.innerHTML = html;
+  
+  // Add hover effect
+  setTimeout(() => {
+    document.querySelectorAll('.collection-order-item').forEach(item => {
+      item.addEventListener('mouseenter', function() {
+        this.style.background = 'var(--card2)';
+      });
+      item.addEventListener('mouseleave', function() {
+        this.style.background = 'transparent';
+      });
+    });
+  }, 100);
+}
+
+function toggleCollectionAccordion() {
+  const accordion = document.getElementById('collectionAccordion');
+  const ordersText = document.getElementById('collectionOrders');
+  
+  if (accordion.style.maxHeight === '0px' || accordion.style.maxHeight === '') {
+    // Open accordion
+    accordion.style.maxHeight = '400px';
+    ordersText.innerHTML = ordersText.innerHTML.replace('▼', '▲');
+  } else {
+    // Close accordion
+    accordion.style.maxHeight = '0px';
+    ordersText.innerHTML = ordersText.innerHTML.replace('▲', '▼');
+  }
 }
 
 // ============================================================
@@ -4250,6 +4375,29 @@ function updateOrderStatus(orderId, newStatus) {
       const orderLinks = previousUnpaidOrders.map(o => o.orderNo).join(', ');
       showToast(`⚠️ Cannot mark as Paid & Delivered! Customer has ${previousUnpaidOrders.length} unpaid previous order(s): ${orderLinks}. Please settle previous orders first.`, 'error');
       return;
+    }
+    
+    // AUTO-COLLECT PAYMENT if there's remaining balance
+    const balance = (order.totalAmount || 0) - (order.paidAmount || 0);
+    if (balance > 0) {
+      // Get payment mode from the collect payment section
+      const modeSelect = document.getElementById('collectMode');
+      const paymentMode = modeSelect ? modeSelect.value : 'cash';
+      
+      // Add payment to paidAmount
+      order.paidAmount = order.totalAmount; // Pay full balance
+      order.paymentMode = paymentMode;
+      
+      // Track in payment history
+      if (!order.paymentHistory) order.paymentHistory = [];
+      order.paymentHistory.push({ 
+        amount: balance, 
+        mode: paymentMode, 
+        date: new Date().toISOString(), 
+        by: currentUser.name 
+      });
+      
+      showToast(`Auto-collected ₹${balance.toFixed(2)} (${paymentMode === 'upi' ? 'UPI' : 'Cash'}) 💰`, 'success');
     }
   }
 
