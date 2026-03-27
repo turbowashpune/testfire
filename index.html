@@ -16,6 +16,7 @@
   --orange-dark: #CC5500;
   --yellow: #FFD700;
   --yellow-light: #FFE44D;
+  --coral: #FF8A65;
   --dark: #1A1A2E;
   --dark2: #16213E;
   --dark3: #0F3460;
@@ -36,6 +37,15 @@
   --radius2: 12px;
   --radius3: 8px;
   --bottom-nav: 70px;
+  
+  /* Gradient Variables */
+  --gradient-primary: linear-gradient(135deg, #FF6B00 0%, #FFB300 50%, #FF8A65 100%);
+  --gradient-primary-reverse: linear-gradient(135deg, #FF8A65 0%, #FFB300 50%, #FF6B00 100%);
+  --gradient-accent: linear-gradient(135deg, #FFD700 0%, #FFB300 50%, #FF6B00 100%);
+  --gradient-warm: linear-gradient(135deg, #FF6B00 0%, #FF8C33 50%, #FFA726 100%);
+  --gradient-sunset: linear-gradient(135deg, #FF6B00 0%, #FF8A65 50%, #FFAB91 100%);
+  --gradient-gold: linear-gradient(135deg, #FFD700 0%, #FFC107 50%, #FFB300 100%);
+  --gradient-dark: linear-gradient(135deg, #1A1A2E 0%, #16213E 50%, #0F3460 100%);
 }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; background:#f0f2f8; color:var(--text); }
@@ -91,9 +101,9 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
 
 /* ===== TOP HEADER ===== */
 .top-header {
-  background:linear-gradient(135deg, var(--dark) 0%, var(--dark2) 100%);
+  background:var(--gradient-primary);
   padding:12px 16px; display:flex; align-items:center; gap:12px;
-  position:sticky; top:0; z-index:100; box-shadow:0 2px 15px rgba(0,0,0,0.2);
+  position:sticky; top:0; z-index:100; box-shadow:0 2px 15px rgba(255,107,0,0.3);
   min-height:60px;
 }
 .header-logo { height:36px; width:auto; border-radius:6px; }
@@ -126,10 +136,10 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
 .nav-item .nav-icon { font-size:20px; transition:transform 0.2s; }
 .nav-item .nav-label { font-size:9px; font-weight:600; color:var(--text3); transition:color 0.2s; text-transform:uppercase; letter-spacing:0.3px; }
 .nav-item.active .nav-icon { transform:scale(1.1); }
-.nav-item.active .nav-label { color:var(--orange); }
-.nav-item.active::after { content:''; position:absolute; bottom:-1px; left:50%; transform:translateX(-50%); width:32px; height:3px; background:var(--orange); border-radius:3px 3px 0 0; }
+.nav-item.active .nav-label { background:var(--gradient-primary); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.nav-item.active::after { content:''; position:absolute; bottom:-1px; left:50%; transform:translateX(-50%); width:32px; height:3px; background:var(--gradient-primary); border-radius:3px 3px 0 0; }
 .nav-fab {
-  width:52px; height:52px; border-radius:16px; background:linear-gradient(135deg,var(--orange),var(--orange-light));
+  width:52px; height:52px; border-radius:16px; background:var(--gradient-primary);
   border:none; display:flex; align-items:center; justify-content:center; cursor:pointer;
   font-size:24px; color:white; box-shadow:0 6px 20px rgba(255,107,0,0.4);
   transform:translateY(-10px); transition:all 0.2s; flex-shrink:0;
@@ -158,18 +168,29 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
 .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:8px 16px; }
 .stat-card {
   background:white; border-radius:var(--radius2); padding:14px; box-shadow:var(--shadow2);
-  border-left:4px solid transparent; transition:transform 0.2s; cursor:default;
+  border:none; transition:all 0.2s; cursor:default; position:relative; overflow:hidden;
 }
+.stat-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; bottom:0;
+  opacity:0.05; z-index:0; border-radius:var(--radius2);
+}
+.stat-card > * { position:relative; z-index:1; }
 .stat-card:active { transform:scale(0.97); }
 .stat-card .stat-icon { font-size:22px; margin-bottom:6px; }
 .stat-card .stat-val { font-family:'Nunito',sans-serif; font-weight:900; font-size:26px; line-height:1; }
 .stat-card .stat-lbl { font-size:11px; color:var(--text2); margin-top:2px; font-weight:600; }
-.stat-card.orange { border-left-color:var(--orange); } .stat-card.orange .stat-val { color:var(--orange); }
-.stat-card.yellow { border-left-color:var(--warning); } .stat-card.yellow .stat-val { color:var(--warning); }
-.stat-card.green { border-left-color:var(--success); } .stat-card.green .stat-val { color:var(--success); }
-.stat-card.red { border-left-color:var(--danger); } .stat-card.red .stat-val { color:var(--danger); }
-.stat-card.blue { border-left-color:var(--info); } .stat-card.blue .stat-val { color:var(--info); }
-.stat-card.purple { border-left-color:var(--purple); } .stat-card.purple .stat-val { color:var(--purple); }
+.stat-card.orange::before { background:var(--gradient-primary); }
+.stat-card.orange .stat-val { background:var(--gradient-primary); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.stat-card.yellow::before { background:var(--gradient-gold); }
+.stat-card.yellow .stat-val { background:var(--gradient-gold); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.stat-card.green::before { background:linear-gradient(135deg, #00C853, #00E676); }
+.stat-card.green .stat-val { background:linear-gradient(135deg, #00C853, #00E676); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.stat-card.red::before { background:linear-gradient(135deg, #F44336, #FF6F60); }
+.stat-card.red .stat-val { background:linear-gradient(135deg, #F44336, #FF6F60); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.stat-card.blue::before { background:linear-gradient(135deg, #2196F3, #42A5F5); }
+.stat-card.blue .stat-val { background:linear-gradient(135deg, #2196F3, #42A5F5); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.stat-card.purple::before { background:linear-gradient(135deg, #7C4DFF, #9575CD); }
+.stat-card.purple .stat-val { background:linear-gradient(135deg, #7C4DFF, #9575CD); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
 .section-header { padding:12px 16px 6px; display:flex; align-items:center; justify-content:space-between; }
 .section-header h3 { font-family:'Nunito',sans-serif; font-weight:800; font-size:15px; color:var(--text); }
 .section-header a { color:var(--orange); font-size:12px; font-weight:600; cursor:pointer; }
@@ -188,13 +209,13 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
   padding:3px 10px; border-radius:20px; font-size:10px; font-weight:700;
   text-transform:uppercase; letter-spacing:0.5px;
 }
-.status-received { background:#E3F2FD; color:#1565C0; }
-.status-inprogress { background:#FFF8E1; color:#F57F17; }
-.status-ready { background:#E8F5E9; color:#2E7D32; }
-.status-delivered { background:#F3E5F5; color:#6A1B9A; }
-.status-paid_delivered { background:#E8F5E9; color:#1B5E20; }
-.status-unpaid_delivered { background:#FFF3E0; color:#E65100; }
-.status-cancelled { background:#FFEBEE; color:#B71C1C; }
+.status-received { background:linear-gradient(135deg, #E3F2FD, #BBDEFB); color:#1565C0; }
+.status-inprogress { background:linear-gradient(135deg, #FFF8E1, #FFECB3); color:#F57F17; }
+.status-ready { background:linear-gradient(135deg, #E8F5E9, #C8E6C9); color:#2E7D32; }
+.status-delivered { background:linear-gradient(135deg, #F3E5F5, #E1BEE7); color:#6A1B9A; }
+.status-paid_delivered { background:linear-gradient(135deg, #E8F5E9, #A5D6A7); color:#1B5E20; }
+.status-unpaid_delivered { background:linear-gradient(135deg, #FFF3E0, #FFE0B2); color:#E65100; }
+.status-cancelled { background:linear-gradient(135deg, #FFEBEE, #FFCDD2); color:#B71C1C; }
 .order-customer { font-weight:600; font-size:14px; color:var(--text); }
 .order-phone { font-size:12px; color:var(--text2); }
 .order-services { display:flex; flex-wrap:wrap; gap:4px; margin:6px 0; }
@@ -253,7 +274,20 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
   border:1.5px solid var(--border); background:white; color:var(--text2);
   cursor:pointer; white-space:nowrap; transition:all 0.2s; flex-shrink:0;
 }
-.filter-tab.active { background:var(--orange); border-color:var(--orange); color:white; box-shadow:0 3px 10px rgba(255,107,0,0.3); }
+.filter-tab.active { background:var(--gradient-primary); border-color:transparent; color:white; box-shadow:0 3px 10px rgba(255,107,0,0.3); }
+
+/* ===== MAIN TABS ===== */
+.main-tab { position:relative; }
+.main-tab.active::after {
+  content:''; position:absolute; bottom:-2px; left:0; right:0; height:3px;
+  background:var(--gradient-primary); border-radius:3px 3px 0 0;
+}
+.main-tab.active .activeCount,
+.main-tab.active #activeCount,
+.main-tab.active #completedCount,
+.main-tab.active #archiveCount {
+  background:var(--gradient-primary) !important;
+}
 
 /* ===== BUTTONS ===== */
 .btn {
@@ -262,7 +296,8 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
   border:none; font-family:'Poppins',sans-serif; transition:all 0.2s;
 }
 .btn:active { transform:scale(0.96); }
-.btn-primary { background:linear-gradient(135deg,var(--orange),var(--orange-light)); color:white; box-shadow:0 4px 15px rgba(255,107,0,0.3); }
+.btn-primary { background:var(--gradient-primary); color:white; box-shadow:0 4px 15px rgba(255,107,0,0.3); }
+.btn-primary:hover { box-shadow:0 6px 20px rgba(255,107,0,0.4); }
 .btn-secondary { background:var(--card2); color:var(--text); border:1.5px solid var(--border); }
 .btn-danger { background:linear-gradient(135deg,#F44336,#E53935); color:white; box-shadow:0 4px 15px rgba(244,67,54,0.3); }
 .btn-success { background:linear-gradient(135deg,var(--success),#00A846); color:white; box-shadow:0 4px 15px rgba(0,200,83,0.3); }
@@ -270,6 +305,7 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
 .btn-sm { padding:7px 14px; font-size:12px; border-radius:8px; }
 .btn-full { width:100%; justify-content:center; }
 .btn-outline { background:transparent; border:2px solid var(--orange); color:var(--orange); }
+.btn-outline:hover { background:var(--gradient-primary); color:white; border-color:transparent; }
 
 /* ===== MODAL ===== */
 .modal-overlay {
@@ -606,22 +642,22 @@ input[type="number"] {
         </div>
         <!-- Stats Grid -->
         <div class="stats-grid" id="statsGrid">
-          <div class="stat-card orange">
+          <div class="stat-card orange" onclick="navigateToTodayOrders()" style="cursor:pointer;">
             <div class="stat-icon">📦</div>
             <div class="stat-val" id="statToday">0</div>
             <div class="stat-lbl">Today's Orders</div>
           </div>
-          <div class="stat-card yellow">
+          <div class="stat-card yellow" onclick="navigateToPendingOrders()" style="cursor:pointer;">
             <div class="stat-icon">⏳</div>
             <div class="stat-val" id="statPending">0</div>
             <div class="stat-lbl">Pending Orders</div>
           </div>
-          <div class="stat-card green">
+          <div class="stat-card green" onclick="navigateToReadyOrders()" style="cursor:pointer;">
             <div class="stat-icon">✅</div>
             <div class="stat-val" id="statReady">0</div>
             <div class="stat-lbl">Ready for Pickup</div>
           </div>
-          <div class="stat-card red">
+          <div class="stat-card red" onclick="navigateToOverdueOrders()" style="cursor:pointer;">
             <div class="stat-icon">🚨</div>
             <div class="stat-val" id="statOverdue">0</div>
             <div class="stat-lbl">Overdue Orders</div>
@@ -672,7 +708,7 @@ input[type="number"] {
             <div class="collection-tabs" style="display:flex;gap:8px;margin-bottom:12px;">
               <button class="collection-tab" onclick="switchCollectionTab('total',this)" style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--border);background:white;font-size:13px;font-weight:700;cursor:pointer;color:var(--text2);">Total</button>
               <button class="collection-tab" onclick="switchCollectionTab('online',this)" style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--border);background:white;font-size:13px;font-weight:700;cursor:pointer;color:var(--text2);">Online</button>
-              <button class="collection-tab active" onclick="switchCollectionTab('cash',this)" style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--orange);background:var(--orange);font-size:13px;font-weight:700;cursor:pointer;color:white;">Cash</button>
+              <button class="collection-tab active" onclick="switchCollectionTab('cash',this)" style="flex:1;padding:10px;border-radius:8px;border:2px solid transparent;background:var(--gradient-primary);font-size:13px;font-weight:700;cursor:pointer;color:white;">Cash</button>
             </div>
             
             <!-- Collection Display -->
@@ -696,14 +732,14 @@ input[type="number"] {
       <div class="page-content">
         <!-- Main Tabs: Active, Completed, Archive -->
         <div class="main-tabs" style="display:flex;border-bottom:2px solid var(--border);background:var(--card);margin-bottom:12px;">
-          <div class="main-tab active" onclick="switchOrderTab('active',this)" style="flex:1;text-align:center;padding:12px;font-weight:700;font-size:13px;cursor:pointer;border-bottom:3px solid var(--orange);color:var(--orange);">
-            Active <span id="activeCount" style="background:var(--orange);color:white;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;">0</span>
+          <div class="main-tab active" onclick="switchOrderTab('active',this)" style="flex:1;text-align:center;padding:8px 4px;font-weight:700;font-size:13px;cursor:pointer;border-bottom:3px solid var(--orange);color:var(--orange);display:flex;flex-direction:column;align-items:center;gap:2px;">
+            <div>Active <span id="activeCount" style="background:var(--orange);color:white;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:2px;display:inline-block;">0</span></div>
           </div>
-          <div class="main-tab" onclick="switchOrderTab('completed',this)" style="flex:1;text-align:center;padding:12px;font-weight:700;font-size:13px;cursor:pointer;border-bottom:3px solid transparent;color:var(--text2);">
-            Completed <span id="completedCount" style="background:var(--text3);color:white;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;">0</span>
+          <div class="main-tab" onclick="switchOrderTab('completed',this)" style="flex:1;text-align:center;padding:8px 4px;font-weight:700;font-size:13px;cursor:pointer;border-bottom:3px solid transparent;color:var(--text2);display:flex;flex-direction:column;align-items:center;gap:2px;">
+            <div>Completed <span id="completedCount" style="background:var(--text3);color:white;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:2px;display:inline-block;">0</span></div>
           </div>
-          <div class="main-tab" onclick="switchOrderTab('archive',this)" style="flex:1;text-align:center;padding:12px;font-weight:700;font-size:13px;cursor:pointer;border-bottom:3px solid transparent;color:var(--text2);">
-            Archive <span id="archiveCount" style="background:var(--text3);color:white;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px;">0</span>
+          <div class="main-tab" onclick="switchOrderTab('archive',this)" style="flex:1;text-align:center;padding:8px 4px;font-weight:700;font-size:13px;cursor:pointer;border-bottom:3px solid transparent;color:var(--text2);display:flex;flex-direction:column;align-items:center;gap:2px;">
+            <div>Archive <span id="archiveCount" style="background:var(--text3);color:white;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:2px;display:inline-block;">0</span></div>
           </div>
         </div>
 
@@ -718,11 +754,13 @@ input[type="number"] {
         <!-- Sub-filters (Dynamic based on active tab) -->
         <div class="filter-tabs" id="orderFilterTabs">
           <!-- Active tab filters -->
-          <div class="filter-tab active" onclick="setOrderFilter('all',this)">All</div>
-          <div class="filter-tab" onclick="setOrderFilter('received',this)">Received</div>
-          <div class="filter-tab" onclick="setOrderFilter('inprogress',this)">In-Progress</div>
-          <div class="filter-tab" onclick="setOrderFilter('ready',this)">Ready</div>
-          <div class="filter-tab" onclick="setOrderFilter('unpaid_delivered',this)">Unpaid</div>
+          <div class="filter-tab active" onclick="toggleOrderFilter('all',this)">All</div>
+          <div class="filter-tab" onclick="toggleOrderFilter('received',this)">Received</div>
+          <div class="filter-tab" onclick="toggleOrderFilter('inprogress',this)">In-Progress</div>
+          <div class="filter-tab" onclick="toggleOrderFilter('ready',this)">Ready</div>
+          <div class="filter-tab" onclick="toggleOrderFilter('unpaid_delivered',this)">Unpaid</div>
+          <div class="filter-tab" onclick="toggleOrderFilter('due_today',this)">Due Today</div>
+          <div class="filter-tab" onclick="toggleOrderFilter('overdue',this)">Overdue</div>
         </div>
 
         <!-- Orders List -->
@@ -1594,7 +1632,7 @@ function getLogo() {
 // CURRENT USER & SESSION
 // ============================================================
 let currentUser = null;
-let currentOrderFilter = 'all';
+let currentOrderFilter = ['all']; // Array to support multi-select
 let currentOrderTab = 'active'; // active, completed, archive
 let archiveOffset = 0; // For pagination in archive
 let archiveLimit = 15; // Load 15 at a time
@@ -1996,6 +2034,98 @@ function switchPage(pageId) {
   if (pageId === 'pageCustomers') renderCustomers();
 }
 
+// Navigation functions for dashboard tiles
+function navigateToTodayOrders() {
+  switchPage('pageDueDateNew');
+}
+
+function navigateToPendingOrders() {
+  // Switch to Orders page with Active tab and filters: Received, In-Progress, Ready
+  currentOrderTab = 'active';
+  currentOrderFilter = ['received', 'inprogress', 'ready'];
+  switchPage('pageOrders');
+  
+  // Update tab UI
+  setTimeout(() => {
+    document.querySelectorAll('.main-tab').forEach(t => {
+      t.classList.remove('active');
+      t.style.borderBottomColor = 'transparent';
+      t.style.color = 'var(--text2)';
+    });
+    const activeTab = document.querySelector('.main-tab[onclick*="active"]');
+    if (activeTab) {
+      activeTab.classList.add('active');
+      activeTab.style.borderBottomColor = 'var(--orange)';
+      activeTab.style.color = 'var(--orange)';
+    }
+    
+    // Update filter tabs
+    document.querySelectorAll('#orderFilterTabs .filter-tab').forEach(t => {
+      t.classList.remove('active');
+      const filterName = t.textContent.trim().toLowerCase().replace('-', '').replace(' ', '_');
+      if (currentOrderFilter.includes('received') && filterName === 'received') t.classList.add('active');
+      if (currentOrderFilter.includes('inprogress') && filterName === 'inprogress') t.classList.add('active');
+      if (currentOrderFilter.includes('ready') && filterName === 'ready') t.classList.add('active');
+    });
+  }, 100);
+}
+
+function navigateToReadyOrders() {
+  // Switch to Orders page with Active tab and filter: Ready
+  currentOrderTab = 'active';
+  currentOrderFilter = ['ready'];
+  switchPage('pageOrders');
+  
+  // Update tab UI
+  setTimeout(() => {
+    document.querySelectorAll('.main-tab').forEach(t => {
+      t.classList.remove('active');
+      t.style.borderBottomColor = 'transparent';
+      t.style.color = 'var(--text2)';
+    });
+    const activeTab = document.querySelector('.main-tab[onclick*="active"]');
+    if (activeTab) {
+      activeTab.classList.add('active');
+      activeTab.style.borderBottomColor = 'var(--orange)';
+      activeTab.style.color = 'var(--orange)';
+    }
+    
+    // Update filter tabs
+    document.querySelectorAll('#orderFilterTabs .filter-tab').forEach(t => {
+      t.classList.remove('active');
+      if (t.textContent.trim() === 'Ready') t.classList.add('active');
+    });
+  }, 100);
+}
+
+function navigateToOverdueOrders() {
+  // Switch to Orders page with Active tab and filter: Overdue
+  currentOrderTab = 'active';
+  currentOrderFilter = ['overdue'];
+  switchPage('pageOrders');
+  
+  // Update tab UI
+  setTimeout(() => {
+    document.querySelectorAll('.main-tab').forEach(t => {
+      t.classList.remove('active');
+      t.style.borderBottomColor = 'transparent';
+      t.style.color = 'var(--text2)';
+    });
+    const activeTab = document.querySelector('.main-tab[onclick*="active"]');
+    if (activeTab) {
+      activeTab.classList.add('active');
+      activeTab.style.borderBottomColor = 'var(--orange)';
+      activeTab.style.color = 'var(--orange)';
+    }
+    
+    // Update filter tabs
+    document.querySelectorAll('#orderFilterTabs .filter-tab').forEach(t => {
+      t.classList.remove('active');
+      if (t.textContent.trim() === 'Overdue') t.classList.add('active');
+    });
+  }, 100);
+}
+
 // ============================================================
 // DASHBOARD
 // ============================================================
@@ -2266,8 +2396,8 @@ function switchCollectionTab(tab, el) {
     t.style.background = 'white';
     t.style.color = 'var(--text2)';
   });
-  el.style.border = '2px solid var(--orange)';
-  el.style.background = 'var(--orange)';
+  el.style.border = '2px solid transparent';
+  el.style.background = 'var(--gradient-primary)';
   el.style.color = 'white';
   
   // Update display
@@ -2670,9 +2800,17 @@ function renderOrders() {
     // Active: All orders that are NOT completed
     filtered = allOrders.filter(o => !isCompleted(o));
     
-    // Apply sub-filter
-    if (currentOrderFilter !== 'all') {
-      filtered = filtered.filter(o => o.status === currentOrderFilter);
+    // Apply sub-filter (multi-select support)
+    if (!currentOrderFilter.includes('all')) {
+      filtered = filtered.filter(o => {
+        // Check status filters
+        const statusMatch = currentOrderFilter.some(f => {
+          if (f === 'due_today') return isDueToday(o);
+          if (f === 'overdue') return isOverdue(o);
+          return o.status === f;
+        });
+        return statusMatch;
+      });
     }
   } 
   else if (currentOrderTab === 'completed') {
@@ -2684,10 +2822,8 @@ function renderOrders() {
     });
     
     // Apply sub-filter
-    if (currentOrderFilter === 'paid_delivered') {
-      filtered = filtered.filter(o => o.status === 'paid_delivered');
-    } else if (currentOrderFilter === 'cancelled') {
-      filtered = filtered.filter(o => o.status === 'cancelled');
+    if (!currentOrderFilter.includes('all')) {
+      filtered = filtered.filter(o => currentOrderFilter.includes(o.status));
     }
   } 
   else if (currentOrderTab === 'archive') {
@@ -2820,28 +2956,30 @@ function switchOrderTab(tab, el) {
   el.style.color = 'var(--orange)';
   
   // Reset sub-filter to "All"
-  currentOrderFilter = 'all';
+  currentOrderFilter = ['all'];
   
   // Update sub-filter tabs based on selected main tab
   const filterTabs = document.getElementById('orderFilterTabs');
   
   if (tab === 'active') {
     filterTabs.innerHTML = `
-      <div class="filter-tab active" onclick="setOrderFilter('all',this)">All</div>
-      <div class="filter-tab" onclick="setOrderFilter('received',this)">Received</div>
-      <div class="filter-tab" onclick="setOrderFilter('inprogress',this)">In-Progress</div>
-      <div class="filter-tab" onclick="setOrderFilter('ready',this)">Ready</div>
-      <div class="filter-tab" onclick="setOrderFilter('unpaid_delivered',this)">Unpaid</div>
+      <div class="filter-tab active" onclick="toggleOrderFilter('all',this)">All</div>
+      <div class="filter-tab" onclick="toggleOrderFilter('received',this)">Received</div>
+      <div class="filter-tab" onclick="toggleOrderFilter('inprogress',this)">In-Progress</div>
+      <div class="filter-tab" onclick="toggleOrderFilter('ready',this)">Ready</div>
+      <div class="filter-tab" onclick="toggleOrderFilter('unpaid_delivered',this)">Unpaid</div>
+      <div class="filter-tab" onclick="toggleOrderFilter('due_today',this)">Due Today</div>
+      <div class="filter-tab" onclick="toggleOrderFilter('overdue',this)">Overdue</div>
     `;
   } else if (tab === 'completed') {
     filterTabs.innerHTML = `
-      <div class="filter-tab active" onclick="setOrderFilter('all',this)">All</div>
-      <div class="filter-tab" onclick="setOrderFilter('paid_delivered',this)">Paid</div>
-      <div class="filter-tab" onclick="setOrderFilter('cancelled',this)">Cancelled</div>
+      <div class="filter-tab active" onclick="toggleOrderFilter('all',this)">All</div>
+      <div class="filter-tab" onclick="toggleOrderFilter('paid_delivered',this)">Paid</div>
+      <div class="filter-tab" onclick="toggleOrderFilter('cancelled',this)">Cancelled</div>
     `;
   } else if (tab === 'archive') {
     filterTabs.innerHTML = `
-      <div class="filter-tab active" onclick="setOrderFilter('all',this)">All</div>
+      <div class="filter-tab active" onclick="toggleOrderFilter('all',this)">All</div>
     `;
   }
   
@@ -2853,11 +2991,47 @@ function loadMoreArchive() {
   renderOrders();
 }
 
-function setOrderFilter(filter, el) {
-  currentOrderFilter = filter;
-  document.querySelectorAll('#orderFilterTabs .filter-tab').forEach(t => t.classList.remove('active'));
-  el.classList.add('active');
+function toggleOrderFilter(filter, el) {
+  // If clicking "All", deselect everything else and select only "All"
+  if (filter === 'all') {
+    currentOrderFilter = ['all'];
+    document.querySelectorAll('#orderFilterTabs .filter-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+  } else {
+    // If "All" is selected, remove it first
+    if (currentOrderFilter.includes('all')) {
+      currentOrderFilter = [];
+      document.querySelectorAll('#orderFilterTabs .filter-tab').forEach(t => {
+        if (t.textContent.trim() === 'All') t.classList.remove('active');
+      });
+    }
+    
+    // Toggle the clicked filter
+    if (currentOrderFilter.includes(filter)) {
+      // Remove filter
+      currentOrderFilter = currentOrderFilter.filter(f => f !== filter);
+      el.classList.remove('active');
+    } else {
+      // Add filter
+      currentOrderFilter.push(filter);
+      el.classList.add('active');
+    }
+    
+    // If no filters selected, select "All"
+    if (currentOrderFilter.length === 0) {
+      currentOrderFilter = ['all'];
+      document.querySelectorAll('#orderFilterTabs .filter-tab').forEach(t => {
+        if (t.textContent.trim() === 'All') t.classList.add('active');
+      });
+    }
+  }
+  
   renderOrders();
+}
+
+// Legacy function for backward compatibility
+function setOrderFilter(filter, el) {
+  toggleOrderFilter(filter, el);
 }
 
 function filterOrders() { renderOrders(); }
