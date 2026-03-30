@@ -101,9 +101,9 @@ html, body { height:100%; overflow:hidden; font-family:'Poppins',sans-serif; bac
 
 /* ===== TOP HEADER ===== */
 .top-header {
-  background:var(--gradient-primary);
+  background:linear-gradient(135deg, var(--dark) 0%, var(--dark2) 100%);
   padding:12px 16px; display:flex; align-items:center; gap:12px;
-  position:sticky; top:0; z-index:100; box-shadow:0 2px 15px rgba(255,107,0,0.3);
+  position:sticky; top:0; z-index:100; box-shadow:0 2px 15px rgba(0,0,0,0.2);
   min-height:60px;
 }
 .header-logo { height:36px; width:auto; border-radius:6px; }
@@ -1636,6 +1636,9 @@ let currentOrderFilter = ['all']; // Array to support multi-select
 let currentOrderTab = 'active'; // active, completed, archive
 let archiveOffset = 0; // For pagination in archive
 let archiveLimit = 15; // Load 15 at a time
+let customerHistoryOffset = 0; // For customer order history pagination
+let customerHistoryPhone = ''; // Track current customer phone
+let customerHistoryName = ''; // Track current customer name
 let editingOrderId = null;
 let currentInvoiceOrderId = null;
 let dueDateRefreshInterval = null;
@@ -4536,6 +4539,20 @@ function showOrderDetail(orderId) {
       <div style="font-size:13px;">${order.notes}</div>
     </div>` : ''}
 
+    ${(() => {
+      // Check if customer has other orders
+      const customerOrders = getCustomerOrderHistory(order.customerPhone, order.id);
+      
+      if (customerOrders.length === 0) return '';
+      
+      return `<div style="margin-bottom:12px;">
+        <button onclick="showCustomerOrderHistoryPaginated('${order.customerPhone}','${order.customerName}')" 
+          class="btn btn-secondary btn-full" style="display:flex;align-items:center;justify-content:center;gap:6px;">
+          📋 Customer Order History (${customerOrders.length})
+        </button>
+      </div>`;
+    })()}
+
     <div>
       <div style="font-weight:700;margin-bottom:8px;color:var(--text2);font-size:12px;text-transform:uppercase;">Status History</div>
       ${statusHistoryHtml}
@@ -4602,6 +4619,121 @@ function getCustomerPreviousBalance(currentOrder) {
     const balance = (o.totalAmount || 0) - (o.paidAmount || 0);
     return sum + balance;
   }, 0);
+}
+
+function getCustomerOrderHistory(customerPhone, excludeOrderId = null) {
+  const orders = DB.get('orders') || [];
+  
+  // Find all orders for this customer (by phone number)
+  let customerOrders = orders.filter(o => 
+    o.customerPhone === customerPhone && 
+    (excludeOrderId ? o.id !== excludeOrderId : true)
+  );
+  
+  // Sort by creation date (newest first)
+  customerOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  
+  // Limit to 10 most recent orders
+  return customerOrders.slice(0, 10);
+}
+
+function showCustomerOrderHistoryPaginated(customerPhone, customerName) {
+  // Reset pagination when opening
+  customerHistoryOffset = 0;
+  customerHistoryPhone = customerPhone;
+  customerHistoryName = customerName;
+  
+  // Render the modal
+  renderCustomerHistoryModal();
+}
+
+function renderCustomerHistoryModal() {
+  const orders = DB.get('orders') || [];
+  
+  // Get all orders for this customer
+  let customerOrders = orders.filter(o => o.customerPhone === customerHistoryPhone);
+  
+  // Sort by creation date (newest first)
+  customerOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  
+  const totalOrders = customerOrders.length;
+  
+  // Get orders for current page (10 at a time)
+  const ordersToShow = customerOrders.slice(0, customerHistoryOffset + 10);
+  const hasMore = totalOrders > ordersToShow.length;
+  
+  // Calculate stats
+  const totalSpent = customerOrders.reduce((sum, o) => sum + (o.paidAmount || 0), 0);
+  const totalDue = customerOrders.reduce((sum, o) => sum + Math.max(0, (o.totalAmount || 0) - (o.paidAmount || 0)), 0);
+  
+  const html = `
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="width:64px;height:64px;border-radius:20px;background:var(--gradient-primary);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;color:white;margin:0 auto 8px;font-family:'Nunito',sans-serif;">${customerHistoryName.charAt(0).toUpperCase()}</div>
+      <div style="font-weight:800;font-size:18px;">${customerHistoryName}</div>
+      <div style="font-size:14px;color:var(--text2);">📞 ${customerHistoryPhone}</div>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+      <div style="background:var(--card2);border-radius:10px;padding:10px;text-align:center;">
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:20px;color:var(--orange);">${totalOrders}</div>
+        <div style="font-size:10px;color:var(--text2);">Total Orders</div>
+      </div>
+      <div style="background:var(--card2);border-radius:10px;padding:10px;text-align:center;">
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;color:var(--success);">₹${totalSpent.toFixed(0)}</div>
+        <div style="font-size:10px;color:var(--text2);">Total Paid</div>
+      </div>
+      <div style="background:var(--card2);border-radius:10px;padding:10px;text-align:center;">
+        <div style="font-family:'Nunito',sans-serif;font-weight:900;font-size:16px;color:var(--danger);">₹${totalDue.toFixed(0)}</div>
+        <div style="font-size:10px;color:var(--text2);">Total Due</div>
+      </div>
+    </div>
+    
+    <div style="font-weight:700;font-size:12px;color:var(--text2);text-transform:uppercase;margin-bottom:8px;">
+      Order History (Showing ${ordersToShow.length} of ${totalOrders})
+    </div>
+    
+    <div id="customerHistoryList" style="max-height:400px;overflow-y:auto;">
+      ${ordersToShow.length === 0 ? 
+        '<div class="empty-state"><div class="empty-icon">📋</div><h3>No orders</h3></div>' :
+        ordersToShow.map(o => {
+          const bal = (o.totalAmount || 0) - (o.paidAmount || 0);
+          return `<div onclick="closePopup();showOrderDetail('${o.id}')" style="padding:10px;background:white;border-radius:8px;margin-bottom:6px;cursor:pointer;border:1.5px solid var(--border);transition:all 0.2s;" 
+            onmouseover="this.style.borderColor='var(--orange)';this.style.transform='scale(1.01)'" 
+            onmouseout="this.style.borderColor='var(--border)';this.style.transform='scale(1)'">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+              <div style="font-weight:700;font-size:13px;color:var(--orange);">${o.orderNo}</div>
+              <span class="status-badge ${getStatusClass(o.status)}" style="font-size:9px;padding:2px 8px;">${getStatusLabel(o.status)}</span>
+            </div>
+            <div style="font-size:11px;color:var(--text3);">${formatDateTime(o.createdAt)}</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);">
+              <div style="font-size:12px;font-weight:600;">₹${(o.totalAmount || 0).toFixed(0)}</div>
+              ${bal > 0 ? `<div style="font-size:10px;color:var(--danger);font-weight:600;">Bal: ₹${bal.toFixed(0)}</div>` : `<div style="font-size:10px;color:var(--success);font-weight:600;">✓ Paid</div>`}
+            </div>
+          </div>`;
+        }).join('')
+      }
+    </div>
+    
+    ${hasMore ? `
+      <div style="margin-top:12px;">
+        <button onclick="loadMoreCustomerHistory()" class="btn btn-primary btn-full">
+          Load More (${totalOrders - ordersToShow.length} remaining)
+        </button>
+      </div>
+    ` : ''}
+  `;
+  
+  showPopup('📋', 'Customer Order History', '', html, [
+    { label: 'Close', cls: 'btn-secondary', action: 'closePopup()' }
+  ]);
+}
+
+function loadMoreCustomerHistory() {
+  // Increase offset by 10
+  customerHistoryOffset += 10;
+  
+  // Re-render the modal with more orders
+  renderCustomerHistoryModal();
 }
 
 // ============================================================
@@ -5621,6 +5753,12 @@ function renderCustomers() {
         <div class="customer-name">${c.name}</div>
         <div class="customer-phone">📞 ${c.phone}</div>
         <div style="font-size:11px;color:var(--text3);">Last visit: ${formatDate(c.lastVisit)}</div>
+        <div style="margin-top:6px;">
+          <button onclick="event.stopPropagation();showCustomerOrderHistoryPaginated('${c.phone}','${c.name}')" 
+            style="background:var(--gradient-primary);color:white;border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+            📋 Order History
+          </button>
+        </div>
       </div>
       <div class="customer-stats">
         <div class="customer-orders">${custOrders.length}</div>
